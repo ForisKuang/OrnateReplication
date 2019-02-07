@@ -30,8 +30,25 @@ class OrnateReplicaModel(nn.Module):
 
     def forward(self, features, score):
 
-        prev_layer = torch.reshape(features, (-1, 167, 24, 24, 24))
-        #TODO: Figure out retyper variable, temp soln make matrix 167 x 15
-        retyper = np.zeros((167, 15))
-        prev_layer = prev_layer.premute(0, 2, 3, 4, 1)
-        
+        prev_layer = torch.reshape(features, (-1, self.NB_TYPE, 24, 24, 24))
+
+        # Retyper: a [high dimension * low dimension] tensor
+        retyper_matrix = torch.randn(self.NB_TYPE, self.num_retype)
+
+        # Rearrange dimensions so that the "167" (feature-vector for the point)
+        # is in the innermost dimension
+        prev_layer = prev_layer.permute(0, 2, 3, 4, 1)
+
+        # Dimensions of the new tensor
+        new_map_shape = prev_layer.shape
+        new_map_shape[4] = self.num_retype
+
+        # Reshape so that we have a two-dimensional tensor.
+        # Each row will represent an (x,y,z) point, which has a 167-dimensional feature vector.
+        prev_layer = torch.reshape(prev_layer, (-1, self.NB_TYPE))
+
+        # Multiply each (x,y,z) point's feature vector by the retyper matrix,
+        # to reduce the dimensionality of the feature vectors
+        prev_layer = torch.matmul(prev_layer, retyper_matrix)
+        prev_layer = torch.reshape(prev_layer, new_map_shape)
+
