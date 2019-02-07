@@ -7,25 +7,25 @@ import numpy as np
 
 class OrnateReplicaModel(nn.Module):
 
-    def __init__(self, num_retype=15, activation="elu", final_activation="sigmoid"):
+    def __init__(self, num_retype=15):
         self.num_retype = num_retype
-        self.activation = activation
-        self.final_activation = final_activation
+        self.activation = nn.ELU()
+        self.final_activation = nn.Sigmoid()
         self.CONV1 = 20
         self.CONV2 = 30
         self.CONV3 = 20
         self.NB_TYPE = 167
+        self.batchNorm = nn.BatchNorm3d(167*24*24*24)
+        self.batchNorm1d = nn.BatchNorm(NB_DIMOUT)
+        self.apply_conv1 = conv(self.num_retype, self.CONV1, 3)
+        self.apply_conv2 = conv(self.CONV1, self.CONV2, 4)
+        self.apply_conv3 = conv(self.CONV2, self.CONV3, 3)
+        # Default dropout is set to 0.5 which is the same as Ornate
+        self.dropout = nn.Dropout()
+        self.avgpool3d = nn.AvgPool3d(4, stride=4)
 
-    def conv1(self, stride=1):
-        return nn.Conv3d(self.num_retype, self.CONV1, kernel_size=3, padding=0,
-                stride=stride, bias=False)
-
-    def conv2(self, stride=1):
-        return nn.Conv3d(self.CONV1, self.CONV2, kernel_size=4, padding=0,
-                stride=stride, bias=False)
-
-    def conv3(self,stride=1):
-        return nn.Conv3d(self.CONV2, self.CONV3, kernel_size=4, padding=0,
+    def conv(in_dim, out_dim, kernel_size, stride=1):
+        return nn.Conv3d(in_dim, out_dim, kernel_size=kernel_size, padding=0,
                 stride=stride, bias=False)
 
     def forward(self, features, score):
@@ -52,3 +52,47 @@ class OrnateReplicaModel(nn.Module):
         prev_layer = torch.matmul(prev_layer, retyper_matrix)
         retyped = torch.reshape(prev_layer, new_map_shape)
 
+        # Apply first convolution of kernel size 3
+        # Can experiment with bigger strides
+        prev_layer = self.apply_conv1(retyped)
+
+        # Apply batch normalization, with num_features
+        prev_layer = self.batchNorm(prev_layer)
+        
+        # Apply dropout to prevent overfitting
+        prev_layer = self.dropout(prev_layer)
+
+        # Apply activation function
+        prev_layer = self.activation(prev_layer)
+        
+        # Apply second convolution with kernel size 4
+        prev_layer = self.apply_conv2(prev_layer)
+        
+        # Apply batch normalization, with num_features
+        prev_layer = self.batchNorm(prev_layer)
+
+        # Apply activation function
+        prev_layer = self.activation(prev_layer)
+
+        # Apply second convolution with kernel size 4
+        prev_layer = self.apply_conv3(prev_layer)
+        
+        # Apply batch normalization, with num_features
+        prev_layer = self.batchNorm(prev_layer)
+
+        # Apply activation function
+        prev_layer = self.activation(prev_layer)
+
+        prev_layer = self.avgpool3d(prev_layer)
+        
+        NB_DIMOUT = self.CONV3 * 4 * 4 * 4
+
+        flat0 = torch.reshape(prev_layer, (-1, NB_DIMOUT))
+        
+        prev_layer = self.batchNorm1d(flat0)
+        
+        flat1 = self.activation(prev_layer)
+        
+        prev_layer = torch.squeeze(flat1)
+        
+        return self.final_activation(prev_layer)
