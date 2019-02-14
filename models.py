@@ -23,6 +23,9 @@ class OrnateReplicaModel(nn.Module):
         self.apply_conv1 = self.conv(self.num_retype, self.CONV1, 3)
         self.apply_conv2 = self.conv(self.CONV1, self.CONV2, 4)
         self.apply_conv3 = self.conv(self.CONV2, self.CONV3, 3)
+        self.lin1 = nn.Linear(self.CONV3 * 4 * 4 * 4, 512)
+        self.lin2 = nn.Linear(512, 200)
+        self.lin3 = nn.Linear(200, 1)
         # Default dropout is set to 0.5 which is the same as Ornate
         self.dropout = nn.Dropout()
         self.avgpool3d = nn.AvgPool3d(4, stride=4)
@@ -87,15 +90,12 @@ class OrnateReplicaModel(nn.Module):
         prev_layer = self.activation(prev_layer)
 
         prev_layer = self.avgpool3d(prev_layer)
-        
-        NB_DIMOUT = self.CONV3 * 4 * 4 * 4
 
-        flat0 = torch.reshape(prev_layer, (-1, NB_DIMOUT))
-        
-        prev_layer = self.batchNorm1d(flat0)
-        
-        flat1 = self.activation(prev_layer)
-        
-        prev_layer = torch.squeeze(flat1)
-        
-        return self.final_activation(prev_layer)
+        prev_layer = prev_layer.reshape(prev_layer.size()[0], -1)
+        prev_layer = self.lin1(prev_layer)
+        prev_layer = F.relu(prev_layer)
+
+        prev_layer = self.lin2(prev_layer)
+        prev_layer = F.relu(prev_layer)
+        prev_layer = self.lin3(prev_layer)
+        return prev_layer

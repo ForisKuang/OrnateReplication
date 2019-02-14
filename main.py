@@ -23,7 +23,7 @@ def train(net, dataloader, idx2map2d, optimizer, criterion, epoch):
             inputs.append(map4d)
         inputs = torch.FloatTensor(inputs)
         inputs = inputs.to(device)
-        labels = labels.type(torch.LongTensor)
+        labels = labels.type(torch.FloatTensor)
         labels = labels.to(device)
 
         # forward + backward + optimize
@@ -44,11 +44,11 @@ def test(net, dataloader):
 	total = 0
 	dataTestLoader = dataloader
 	with torch.no_grad():
--   	for data in dataTestLoader:
+		for data in dataTestLoader:
 			inputs, labels = data
 			inputs = inputs.type(torch.FloatTensor)
 			inputs = inputs.to(device)
-			labels = labels.type(torch.LongTensor)
+			labels = labels.type(torch.FloatTensor)
 			labels = labels.to(device)
 			outputs = net(inputs)
 			values, predicted = torch.max(outputs.data, 1)
