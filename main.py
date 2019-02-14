@@ -6,7 +6,7 @@ from data_loader import load_dataset
 import torch.utils.data as utils_data
 import numpy as np
 
-cuda = torch.device('cuda')
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def train(net, dataloader, idx2map2d, optimizer, criterion, epoch):
     
@@ -21,10 +21,10 @@ def train(net, dataloader, idx2map2d, optimizer, criterion, epoch):
             map4d = np.zeros((24, 24, 24, 167))
             map4d[map2d[0,:],map2d[1,:],map2d[2,:],map2d[3,:]] = map2d[4,:]
             inputs.append(map4d)
-        inputs = torch.IntTensor(inputs)
-        inputs = inputs.to(cuda)
+        inputs = torch.FloatTensor(inputs)
+        inputs = inputs.to(device)
         labels = labels.type(torch.LongTensor)
-        labels = labels.to(cuda)
+        labels = labels.to(device)
 
         # forward + backward + optimize
         outputs = net(inputs, labels)
@@ -44,12 +44,12 @@ def test(net, dataloader):
 	total = 0
 	dataTestLoader = dataloader
 	with torch.no_grad():
-		for data in dataTestLoader:
+-   	for data in dataTestLoader:
 			inputs, labels = data
 			inputs = inputs.type(torch.FloatTensor)
-			inputs = inputs.to('cuda')
+			inputs = inputs.to(device)
 			labels = labels.type(torch.LongTensor)
-			labels = labels.to('cuda')
+			labels = labels.to(device)
 			outputs = net(inputs)
 			values, predicted = torch.max(outputs.data, 1)
 			total += labels.size(0)
