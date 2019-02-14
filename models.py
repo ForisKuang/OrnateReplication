@@ -8,6 +8,7 @@ import numpy as np
 class OrnateReplicaModel(nn.Module):
 
     def __init__(self, num_retype=15):
+        super(OrnateReplicaModel, self).__init__()
         self.num_retype = num_retype
         self.activation = nn.ELU()
         self.final_activation = nn.Sigmoid()
@@ -15,16 +16,17 @@ class OrnateReplicaModel(nn.Module):
         self.CONV2 = 30
         self.CONV3 = 20
         self.NB_TYPE = 167
+        self.NB_DIMOUT = 4*4*4*self.CONV3
         self.batchNorm = nn.BatchNorm3d(167*24*24*24)
-        self.batchNorm1d = nn.BatchNorm(NB_DIMOUT)
-        self.apply_conv1 = conv(self.num_retype, self.CONV1, 3)
-        self.apply_conv2 = conv(self.CONV1, self.CONV2, 4)
-        self.apply_conv3 = conv(self.CONV2, self.CONV3, 3)
+        self.batchNorm1d = nn.BatchNorm1d(self.NB_DIMOUT)
+        self.apply_conv1 = self.conv(self.num_retype, self.CONV1, 3)
+        self.apply_conv2 = self.conv(self.CONV1, self.CONV2, 4)
+        self.apply_conv3 = self.conv(self.CONV2, self.CONV3, 3)
         # Default dropout is set to 0.5 which is the same as Ornate
         self.dropout = nn.Dropout()
         self.avgpool3d = nn.AvgPool3d(4, stride=4)
 
-    def conv(in_dim, out_dim, kernel_size, stride=1):
+    def conv(self, in_dim, out_dim, kernel_size, stride=1):
         return nn.Conv3d(in_dim, out_dim, kernel_size=kernel_size, padding=0,
                 stride=stride, bias=False)
 

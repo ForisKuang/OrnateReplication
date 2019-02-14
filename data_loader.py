@@ -27,4 +27,3 @@ def load_dataset(pickle_dir):
                         Y.append(label)
         X, Y = shuffle(X, Y)
         return X, Y, idx2map2d
-
