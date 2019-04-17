@@ -34,66 +34,91 @@ def train(net, dataloader, idx2map2d, optimizer, criterion, epoch):
 
         total_loss += loss.item()
         running_loss += loss.item()
-        if (i + 1) % 2000 == 0:
-            print(running_loss/2000)
+        if (i + 1) % 2 == 0:
+            print(running_loss/2)
             running_loss = 0.0
     print("The total loss is " + str(total_loss/i))
 
 def test(net, dataloader):
-	correct = 0
-	total = 0
-	dataTestLoader = dataloader
-	with torch.no_grad():
-		for data in dataTestLoader:
-			inputs, labels = data
-			inputs = inputs.type(torch.FloatTensor)
-			inputs = inputs.to(device)
-			labels = labels.type(torch.FloatTensor)
-			labels = labels.to(device)
-			outputs = net(inputs)
-			values, predicted = torch.max(outputs.data, 1)
-			total += labels.size(0)
-			for i in range(labels.size(0)):
-				x = predicted[i][0].item()
-				y = labels[i][0].item()
-				if (x == y):
-					correct += 1
+    correct = 0
+    total = 0
+    dataTestLoader = dataloader
+    with torch.no_grad():
+        for data in dataTestLoader:
+            inputs, labels = data
+            inputs = inputs.type(torch.FloatTensor)
+            inputs = inputs.to(device)
+            labels = labels.type(torch.FloatTensor)
+            labels = labels.to(device)
+            outputs = net(inputs)
+            values, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
+            for i in range(labels.size(0)):
+                x = predicted[i][0].item()
+                y = labels[i][0].item()
+                if (x == y):
+                    correct += 1
+    print('Correct: ' + str(correct))
+    print('Total: ' + str(total))
+
 
 def main():
-	num_epochs = 100
+    num_epochs = 10
+    fraction_test = 0.2
+    fraction_validation = 0.2
 
-# Load train data and input as TensorDatset
-	trainX, trainY, idx2map2d = load_dataset('../prot3d_100')
-	trainNumpyX = np.asarray(trainX)
-	trainNumpyY = np.asarray(trainY)
+    # Load true protein structures and fake modelled structures as TensorDataset
+    trueX, trueY, true_idx2map2d = load_dataset('/net/scratch/aivan/decoys/ornate/pkl.natives')
+    modelX, modelY, model_idx2map2d = load_dataset('/net/scratch/aivan/decoys/ornate/pkl.rand70', starting_index=len(trueX))    
 
-	tensor_train_x = torch.from_numpy(trainNumpyX)
-	tensor_train_y = torch.from_numpy(trainNumpyY)
+    # For fake modeled structures, make the label 0
+    modelY = np.zeros_like(modelX)
+    for y in trueY:
+        assert y == 1
+    for y in modelY:
+        assert y == 0
 
-	train_dataset = utils_data.TensorDataset(tensor_train_x, tensor_train_y)
+    # Concatenate true structures and fake ones, and shuffle them
+    # to train the discriminator
+    numpyX = np.asarray(np.concatenate((trueX, modelX)))
+    numpyY = np.asarray(np.concatenate((trueY, modelY))).reshape(-1, 1)
+    np.random.shuffle(numpyX)
+    np.random.shuffle(numpyY)
 
-# Load test data and input as TensorDatset
-	#testX, testY, test_idx2map2d = load_dataset('test_filename')
-	#testNumpyX = np.asarray(testX)
-	#testNumpyY = np.asarray(testY)
+    # Also concatenate the two dictionaries of (true, modelled) structures
+    # (each structure is stored in the 2D representation here)
+    idx2map2d = {**true_idx2map2d, **model_idx2map2d}
 
-	#tensor_test_x = torch.from_numpy(testNumpyX)
-	#tensor_test_y = torch.from_numpy(testNumpyY)
+    # Split data into training/validation/test
+    validation_start = int((1 - fraction_test - fraction_validation) * len(numpyX))
+    test_start = int((1 - fraction_test) * len(numpyX))
+    tensor_train_x = torch.from_numpy(numpyX[:validation_start])
+    tensor_train_y = torch.from_numpy(numpyY[:validation_start])
+    tensor_validation_x = torch.from_numpy(numpyX[validation_start:test_start])
+    tensor_validation_y = torch.from_numpy(numpyY[validation_start:test_start])
+    tensor_test_x = torch.from_numpy(numpyX[test_start:])
+    tensor_test_y = torch.from_numpy(numpyY[test_start:])
 
-	#test_dataset = utils_data.TensorDataset(tensor_test_x, tensor_test_y)
+    # Create TensorDatasets
+    train_dataset = utils_data.TensorDataset(tensor_train_x, tensor_train_y)
+    validation_dataset = utils_data.TensorDataset(tensor_validation_x, tensor_validation_y)
+    test_dataset = utils_data.TensorDataset(tensor_test_x, tensor_test_y)
+    
+    # Create DataLoaders to handle minibatching
+    train_dataloader = utils_data.DataLoader(train_dataset, batch_size=32, shuffle=True, num_workers=4)
+    validation_dataloader = utils_data.DataLoader(validation_dataset, batch_size=32, shuffle=True, num_workers=4)
+    test_dataloader = utils_data.DataLoader(test_dataset, batch_size=16, shuffle=True, num_workers=4)
 
-	train_dataloader = utils_data.DataLoader(train_dataset, batch_size=128, shuffle=True, num_workers=4)
+    # Actually train the model
+    net = OrnateReplicaModel(15)
 
-	#test_dataloader = utils_data.DataLoader(test_dataset, batch_size=128, shuffle=True, num_workers=4)
+    # Binary cross-entropy loss for binary classification (is the structure real or not?)
+    criterion = nn.BCEWithLogitsLoss()
+    optimizer = optim.Adam(net.parameters(), lr=0.01)
 
-# Actually train the model
-	net = OrnateReplicaModel(15)
-	criterion = nn.MSELoss()
-	optimizer = optim.Adam(net.parameters(), lr=0.01)
-	for epoch in range(num_epochs):
-		train(net, train_dataloader, idx2map2d, optimizer, criterion, epoch)
-		test(net, train_dataloader)
-	#test(net, test_dataloader)
+    for epoch in range(num_epochs):
+        train(net, train_dataloader, idx2map2d, optimizer, criterion, epoch)
+        test(net, test_dataloader)
 
 if __name__=='__main__':
-	main()
+    main()
