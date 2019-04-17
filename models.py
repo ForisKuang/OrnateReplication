@@ -34,7 +34,7 @@ class OrnateReplicaModel(nn.Module):
         return nn.Conv3d(in_dim, out_dim, kernel_size=kernel_size, padding=0,
                 stride=stride, bias=False)
 
-    def forward(self, features, score):
+    def forward(self, features):
 
         # Retyper: a [high dimension * low dimension] tensor
         retyper_matrix = torch.randn(self.NB_TYPE, self.num_retype)
