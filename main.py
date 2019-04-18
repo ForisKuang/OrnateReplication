@@ -16,8 +16,10 @@ def train(net, dataloader, idx2map2d, optimizer, criterion, epoch):
     for i, data in enumerate(dataloader, 0):
         indices, labels = data
         inputs = []
+        optimizer.zero_grad()
         for idx in range(len(indices)):
             map2d = idx2map2d[indices.data[idx].item()]
+            assert not np.isnan(map2d).any()
             map4d = np.zeros((24, 24, 24, 167))
             map4d[map2d[0,:],map2d[1,:],map2d[2,:],map2d[3,:]] = map2d[4,:]
             inputs.append(map4d)
@@ -32,13 +34,21 @@ def train(net, dataloader, idx2map2d, optimizer, criterion, epoch):
         loss.backward()
         optimizer.step()
 
+        sigmoid = nn.Sigmoid()
+        probabilities = sigmoid(outputs)
+        for i in range(labels.size(0)):
+            x = probabilities[i].item()
+            y = int(labels[i].item())
+            #print('TRAINING Label: ' + str(y) + ', predicted: ' + str(x))
+ 
+
         total_loss += loss.item()
         running_loss += loss.item()
         if (i + 1) % 2 == 0:
             print(i)
             print(running_loss/2)
             running_loss = 0.0
-    print("The total loss is " + str(total_loss/i))
+    print("The total TRAINING loss is " + str(total_loss/i))
 
 def test(net, dataloader, idx2map2d, criterion):
     correct = 0
@@ -63,14 +73,12 @@ def test(net, dataloader, idx2map2d, criterion):
 
             sigmoid = nn.Sigmoid()
             probabilities = sigmoid(outputs)
-            print('Probabilities: ')
-            print(probabilities.data)
             #values, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             for i in range(labels.size(0)):
                 x = probabilities[i].item()
                 y = int(labels[i].item())
-                print('Label: ' + str(y) + ', predicted: ' + str(x))
+                #print('Label: ' + str(y) + ', predicted: ' + str(x))
                 if (round(x) == y):
                     correct += 1
     print('Correct: ' + str(correct))
@@ -83,8 +91,8 @@ def main():
     fraction_validation = 0.2
 
     # Load true protein structures and fake modelled structures as TensorDataset
-    trueX, trueY, true_idx2map2d = load_dataset('/net/scratch/aivan/decoys/ornate/pkl.natives')
-    modelX, modelY, model_idx2map2d = load_dataset('/net/scratch/aivan/decoys/ornate/pkl.rand70', starting_index=len(trueX))    
+    trueX, trueY, true_idx2map2d = load_dataset('/net/scratch/aivan/decoys/ornate/pkl.natives', num_files=10)
+    modelX, modelY, model_idx2map2d = load_dataset('/net/scratch/aivan/decoys/ornate/pkl.rand70', num_files=30, starting_index=len(trueX), fake=True)    
 
     # For fake modeled structures, make the label 0
     modelY = np.zeros_like(modelX)
@@ -97,8 +105,15 @@ def main():
     # to train the discriminator
     numpyX = np.asarray(np.concatenate((trueX, modelX)))
     numpyY = np.asarray(np.concatenate((trueY, modelY))).reshape(-1, 1)
-    np.random.shuffle(numpyX)
-    np.random.shuffle(numpyY)
+
+    # Shuffle
+    indices = np.arange(numpyX.shape[0])
+    np.random.shuffle(indices)
+    numpyX = numpyX[indices]
+    numpyY = numpyY[indices]
+    numpyX = numpyX[:1000]
+    numpyY = numpyY[:1000]
+    print(numpyY)
 
     # Also concatenate the two dictionaries of (true, modelled) structures
     # (each structure is stored in the 2D representation here)
@@ -129,7 +144,7 @@ def main():
 
     # Binary cross-entropy loss for binary classification (is the structure real or not?)
     criterion = nn.BCEWithLogitsLoss()
-    optimizer = optim.Adam(net.parameters(), lr=0.01)
+    optimizer = optim.Adam(net.parameters(), lr=0.001)
 
     for epoch in range(num_epochs):
         train(net, train_dataloader, idx2map2d, optimizer, criterion, epoch)
