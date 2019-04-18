@@ -27,7 +27,7 @@ def load_dataset(pickle_dir, starting_index=0):
     Y = []
 
     # Adjust number of files to read
-    NUM_FILES = 20
+    NUM_FILES = 1
 
     # Find all .pkl files within pickle_dir (including subdirectories)
     for pickle_file in glob.glob(pickle_dir + '/**/*.pkl', recursive=True)[0:NUM_FILES]:

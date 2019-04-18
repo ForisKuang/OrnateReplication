@@ -35,13 +35,15 @@ def train(net, dataloader, idx2map2d, optimizer, criterion, epoch):
         total_loss += loss.item()
         running_loss += loss.item()
         if (i + 1) % 2 == 0:
+            print(i)
             print(running_loss/2)
             running_loss = 0.0
     print("The total loss is " + str(total_loss/i))
 
-def test(net, dataloader, idx2map2d):
+def test(net, dataloader, idx2map2d, criterion):
     correct = 0
     total = 0
+    total_loss = 0.
     with torch.no_grad():
         for i, data in enumerate(dataloader, 0):
             indices, labels = data
@@ -56,16 +58,24 @@ def test(net, dataloader, idx2map2d):
             labels = labels.type(torch.FloatTensor)
             labels = labels.to(device)
             outputs = net(inputs)
-            values, predicted = torch.max(outputs.data, 1)
+            test_loss = criterion(outputs, labels)
+            total_loss += test_loss
+
+            sigmoid = nn.Sigmoid()
+            probabilities = sigmoid(outputs)
+            print('Probabilities: ')
+            print(probabilities.data)
+            #values, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             for i in range(labels.size(0)):
-                x = predicted[i].item()
-                y = labels[i].item()
-                if (x == y):
+                x = probabilities[i].item()
+                y = int(labels[i].item())
+                print('Label: ' + str(y) + ', predicted: ' + str(x))
+                if (round(x) == y):
                     correct += 1
     print('Correct: ' + str(correct))
     print('Total: ' + str(total))
-
+    print('Test loss: ' + str(total_loss / i))
 
 def main():
     num_epochs = 10
@@ -110,9 +120,9 @@ def main():
     test_dataset = utils_data.TensorDataset(tensor_test_x, tensor_test_y)
     
     # Create DataLoaders to handle minibatching
-    train_dataloader = utils_data.DataLoader(train_dataset, batch_size=64, shuffle=True, num_workers=4)
-    validation_dataloader = utils_data.DataLoader(validation_dataset, batch_size=64, shuffle=True, num_workers=4)
-    test_dataloader = utils_data.DataLoader(test_dataset, batch_size=64, shuffle=True, num_workers=4)
+    train_dataloader = utils_data.DataLoader(train_dataset, batch_size=32, shuffle=True, num_workers=4)
+    validation_dataloader = utils_data.DataLoader(validation_dataset, batch_size=32, shuffle=True, num_workers=4)
+    test_dataloader = utils_data.DataLoader(test_dataset, batch_size=32, shuffle=True, num_workers=4)
 
     # Actually train the model
     net = OrnateReplicaModel(15)
@@ -123,7 +133,7 @@ def main():
 
     for epoch in range(num_epochs):
         train(net, train_dataloader, idx2map2d, optimizer, criterion, epoch)
-        test(net, validation_dataloader, idx2map2d)
+        test(net, validation_dataloader, idx2map2d, criterion)
 
 if __name__=='__main__':
     main()
