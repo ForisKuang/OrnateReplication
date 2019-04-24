@@ -7,6 +7,7 @@ import torch.utils.data as utils_data
 import numpy as np
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print("DEVICE IS {0}".format(str(device)))
 
 def train(net, dataloader, idx2map2d, optimizer, criterion, epoch):
     
@@ -34,21 +35,21 @@ def train(net, dataloader, idx2map2d, optimizer, criterion, epoch):
         loss.backward()
         optimizer.step()
 
-        sigmoid = nn.Sigmoid()
-        probabilities = sigmoid(outputs)
-        for i in range(labels.size(0)):
-            x = probabilities[i].item()
-            y = int(labels[i].item())
-            #print('TRAINING Label: ' + str(y) + ', predicted: ' + str(x))
+        # tanh = nn.Tanh()
+        # probabilities = tanh(outputs)
+        for j in range(labels.size(0)):
+            x = outputs[j].item()
+            y = int(labels[j].item())
+            print('TRAINING Label: ' + str(y) + ', predicted: ' + str(x))
  
 
         total_loss += loss.item()
         running_loss += loss.item()
         if (i + 1) % 2 == 0:
-            print(i)
-            print(running_loss/2)
+            print("Minibatch number: {0}".format(i))
+            print("Current loss: {0}".format(running_loss/2))
             running_loss = 0.0
-    print("The total TRAINING loss is " + str(total_loss/i))
+    print("The total TRAINING loss is " + str(total_loss/(i+1)))
 
 def test(net, dataloader, idx2map2d, criterion):
     correct = 0
@@ -71,19 +72,19 @@ def test(net, dataloader, idx2map2d, criterion):
             test_loss = criterion(outputs, labels)
             total_loss += test_loss
 
-            sigmoid = nn.Sigmoid()
-            probabilities = sigmoid(outputs)
+            # tanh = nn.Tanh()
+            # probabilities = tanh(outputs)
             #values, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
-            for i in range(labels.size(0)):
-                x = probabilities[i].item()
-                y = int(labels[i].item())
-                #print('Label: ' + str(y) + ', predicted: ' + str(x))
+            for j in range(labels.size(0)):
+                x = outputs[j].item()
+                y = int(labels[j].item())
+                print('Test Label: ' + str(y) + ', predicted: ' + str(x))
                 if (round(x) == y):
                     correct += 1
     print('Correct: ' + str(correct))
     print('Total: ' + str(total))
-    print('Test loss: ' + str(total_loss / i))
+    print('Test loss: ' + str(total_loss / (i+1)))
 
 def main():
     num_epochs = 10
@@ -91,8 +92,8 @@ def main():
     fraction_validation = 0.2
 
     # Load true protein structures and fake modelled structures as TensorDataset
-    trueX, trueY, true_idx2map2d = load_dataset('/net/scratch/aivan/decoys/ornate/pkl.natives', num_files=10)
-    modelX, modelY, model_idx2map2d = load_dataset('/net/scratch/aivan/decoys/ornate/pkl.rand70', num_files=30, starting_index=len(trueX), fake=True)    
+    trueX, trueY, true_idx2map2d = load_dataset('/net/scratch/aivan/decoys/ornate/pkl.natives', num_files=20)
+    modelX, modelY, model_idx2map2d = load_dataset('/net/scratch/aivan/decoys/ornate/pkl.rand70', num_files=180, starting_index=len(trueX), fake=True)    
 
     # For fake modeled structures, make the label 0
     modelY = np.zeros_like(modelX)
@@ -111,9 +112,6 @@ def main():
     np.random.shuffle(indices)
     numpyX = numpyX[indices]
     numpyY = numpyY[indices]
-    numpyX = numpyX[:1000]
-    numpyY = numpyY[:1000]
-    print(numpyY)
 
     # Also concatenate the two dictionaries of (true, modelled) structures
     # (each structure is stored in the 2D representation here)
@@ -140,10 +138,10 @@ def main():
     test_dataloader = utils_data.DataLoader(test_dataset, batch_size=32, shuffle=True, num_workers=4)
 
     # Actually train the model
-    net = OrnateReplicaModel(15)
+    net = OrnateReplicaModel(15, device=device).to(device)
 
     # Binary cross-entropy loss for binary classification (is the structure real or not?)
-    criterion = nn.BCEWithLogitsLoss()
+    criterion = nn.BCELoss()
     optimizer = optim.Adam(net.parameters(), lr=0.001)
 
     for epoch in range(num_epochs):

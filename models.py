@@ -7,10 +7,10 @@ import numpy as np
 
 class OrnateReplicaModel(nn.Module):
 
-    def __init__(self, num_retype=15):
+    def __init__(self, num_retype=15, device='cpu'):
         super(OrnateReplicaModel, self).__init__()
         self.num_retype = num_retype
-        self.activation = nn.ELU()
+        self.activation = nn.ReLU()
         self.final_activation = nn.Sigmoid()
         self.CONV1 = 20
         self.CONV2 = 30
@@ -29,6 +29,8 @@ class OrnateReplicaModel(nn.Module):
         # Default dropout is set to 0.5 which is the same as Ornate
         self.dropout = nn.Dropout()
         self.avgpool3d = nn.AvgPool3d(4, stride=4)
+        self.device = device
+        print('model device: ' + str(self.device))
 
     def conv(self, in_dim, out_dim, kernel_size, stride=1):
         return nn.Conv3d(in_dim, out_dim, kernel_size=kernel_size, padding=0,
@@ -37,14 +39,14 @@ class OrnateReplicaModel(nn.Module):
     def forward(self, features):
 
         # Retyper: a [high dimension * low dimension] tensor
-        retyper_matrix = torch.randn(self.NB_TYPE, self.num_retype)
+        retyper_matrix = torch.randn(self.NB_TYPE, self.num_retype).to(self.device)
 
         # (batch_size, 24, 24, 24, 167)
         shape = features.shape
 
         # Reshape so that we have a two-dimensional tensor.
         # Each row will represent an (x,y,z) point, which has a 167-dimensional feature vector.
-        prev_layer = torch.reshape(features, (-1, self.NB_TYPE))
+        prev_layer = torch.reshape(features, (-1, self.NB_TYPE)).to(self.device)
 
         # Multiply each (x,y,z) point's feature vector by the retyper matrix,
         # to reduce the dimensionality of the feature vectors
@@ -98,4 +100,7 @@ class OrnateReplicaModel(nn.Module):
         prev_layer = self.lin2(prev_layer)
         prev_layer = F.relu(prev_layer)
         prev_layer = self.lin3(prev_layer)
+
+        # Apply sigmoid at the end
+        prev_layer = self.final_activation(prev_layer)
         return prev_layer

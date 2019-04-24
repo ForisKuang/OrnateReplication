@@ -40,11 +40,9 @@ def load_dataset(pickle_dir, num_files=None, starting_index=0, fake=False):
             protein = pickle.load(f, encoding='latin1')
             features = protein['features']
             labels = protein['scores']
-            print('len features ' + str(len(features)))
             for i in range(len(features)):
                 # If we're loading modeled structures, exclude the ones that are "realistic" (score > 0.6)
                 if fake:
-                    print(labels[i])
                     if labels[i] > THRESHOLD:
                         continue
                 idx2map2d[idx] = features[i]
