@@ -7,7 +7,7 @@ import torch
 import torch.utils.data as _data
 from sklearn.utils import shuffle
 
-def load_dataset(pickle_dir, num_files=None, starting_index=0, fake=False):
+def load_dataset(pickle_dir, num_files=None, starting_index=0, lower_bound=None, upper_bound=None):
     """
     Constructs a dataset from all the pickle files inside "pickle_dir"
     (including subdirectories). Note that the dataset is NOT shuffled.
@@ -27,7 +27,7 @@ def load_dataset(pickle_dir, num_files=None, starting_index=0, fake=False):
     Y = []
 
     # Adjust number of files to read
-    THRESHOLD = 0.4
+    THRESHOLD = 0.5
 
     # Find all .pkl files within pickle_dir (including subdirectories)
     file_list = glob.glob(pickle_dir + '/**/*.pkl', recursive=True)
@@ -41,9 +41,11 @@ def load_dataset(pickle_dir, num_files=None, starting_index=0, fake=False):
             features = protein['features']
             labels = protein['scores']
             for i in range(len(features)):
-                # If we're loading modeled structures, exclude the ones that are "realistic" (score > 0.6)
-                if fake:
-                    if labels[i] > THRESHOLD:
+                if lower_bound:
+                    if labels[i] < lower_bound:
+                        continue
+                if upper_bound:
+                    if labels[i] > upper_bound:
                         continue
                 idx2map2d[idx] = features[i]
                 X.append(idx)

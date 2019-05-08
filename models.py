@@ -39,19 +39,19 @@ class OrnateReplicaModel(nn.Module):
     def forward(self, features):
 
         # Retyper: a [high dimension * low dimension] tensor
-        retyper_matrix = torch.randn(self.NB_TYPE, self.num_retype).to(self.device)
+        retyper_matrix = torch.nn.Parameter(torch.rand(self.NB_TYPE, self.num_retype, device=self.device), requires_grad=True)
 
         # (batch_size, 24, 24, 24, 167)
         shape = features.shape
 
         # Reshape so that we have a two-dimensional tensor.
         # Each row will represent an (x,y,z) point, which has a 167-dimensional feature vector.
-        prev_layer = torch.reshape(features, (-1, self.NB_TYPE)).to(self.device)
+        prev_layer = torch.reshape(features, (-1, self.NB_TYPE))
 
         # Multiply each (x,y,z) point's feature vector by the retyper matrix,
         # to reduce the dimensionality of the feature vectors
         # (batch_size x 24 x 24 x 24, 167)
-        prev_layer = torch.matmul(prev_layer, retyper_matrix)
+        prev_layer = torch.mm(prev_layer, retyper_matrix)
 
         # (batch_size x 24 x 24 x 24, 15)
         retyped = torch.reshape(prev_layer, (shape[0], shape[1], shape[2], shape[3], self.num_retype))
