@@ -121,17 +121,17 @@ class SurfaceVAE(nn.Module):
         self.batchNorm1 = nn.BatchNorm3d(self.CONV2)
         self.batchNorm2 = nn.BatchNorm3d(self.CONV3)
         self.batchNorm3 = nn.BatchNorm3d(self.CONV4)
-        self.apply_conv1 = self.conv(self.num_retype, self.CONV1, 4, stride=2)
-        self.apply_conv2 = self.conv(self.CONV1, self.CONV2, 4, stride=2)
-        self.apply_conv3 = self.conv(self.CONV2, self.CONV3, 4, strid =2)
-        self.apply_conv4 = self.conv(self.CONV3, self.CONV4, 4, stride=2)
+        self.apply_conv1 = self.conv(self.num_retype, self.CONV1, 3, stride=1, padding=1)
+        self.apply_conv2 = self.conv(self.CONV1, self.CONV2, 4, stride=2, padding=1)
+        self.apply_conv3 = self.conv(self.CONV2, self.CONV3, 4, stride=2, padding=1)
+        self.apply_conv4 = self.conv(self.CONV3, self.CONV4, 4, stride=2, padding=1)
         # Default dropout is set to 0.5
         self.dropout = nn.Dropout()
         self.device = device
         print('model device: ' + str(self.device))
 
-    def conv(self, in_dim, out_dim, kernel_size, stride=1):
-        return nn.Conv3d(in_dim, out_dim, kernel_size=kernel_size, padding=0,
+    def conv(self, in_dim, out_dim, kernel_size, stride=1, padding=0):
+        return nn.Conv3d(in_dim, out_dim, kernel_size=kernel_size, padding=padding,
                 stride=stride, bias=False)
 
     def forward(self, features):
@@ -211,19 +211,18 @@ class Generator(nn.Module):
         self.activation = nn.ReLU()
         self.sig = nn.Sigmoid()
         self.tanh = nn.Tanh()
-        self.DECONV1 = 4
-        self.DECONV2 = 8
-        self.DECONV3 = 16
-        self.DECONV4 = 24
-        self.NB_TYPE = 167
+        self.DECONV0 = 20
+        self.DECONV1 = 40
+        self.DECONV2 = 80
+        self.DECONV3 = 167
         self.batchNorm1 = nn.BatchNorm3d(self.DECONV1)
         self.batchNorm2 = nn.BatchNorm3d(self.DECONV2)
         self.batchNorm3 = nn.BatchNorm3d(self.DECONV3)
         self.batchNorm3 = nn.BatchNorm3d(self.DECONV4)
-        self.apply_deconv1 = self.deconv(self.num_retype, self.DECONV1, 4, stride=2)
-        self.apply_deconv2 = self.deconv(self.DECONV1, self.DECONV2, 4, stride=2)
-        self.apply_deconv3 = self.deconv(self.DECONV2, self.DECONV3, 4, strid =2)
-        self.apply_deconv4 = self.deconv(self.DECONV3, self.DECONV4, 4, stride=2)
+        self.apply_deconv1 = self.deconv(self.DECONV0, self.DECONV1, 4, stride=2)  # [batch size * 3 * 3 * 3 * 20] --> [batch size * 6 * 6 * 6 * 40]
+        self.apply_deconv2 = self.deconv(self.DECONV1, self.DECONV2, 4, stride=2)  # [batch size * 6 * 6 * 6 * 40] --> [batch size * 12 * 12 * 12 * 80]
+        self.apply_deconv3 = self.deconv(self.DECONV2, self.DECONV3, 4, stride=2)  # [batch size * 12 * 12 * 12 * 80] --> [batch size * 24 * 24 * 24 * 167]
+
         # Default dropout is set to 0.5
         self.dropout = nn.Dropout()
         self.device = device
@@ -235,15 +234,14 @@ class Generator(nn.Module):
 
     def forward(self, features):
         
-        start_layer = nn.Linear(200, 20*4*4*4)(features)
+        start_layer = nn.Linear(200, 20*3*3*3)(features)
         
-        reshape_layer = start_layer.reshape(start_layer, (-1, 4, 4, 4, 20))
+        reshape_layer = start_layer.reshape(start_layer, (-1, 3, 3, 3, 20))
 
         prev_layer = self.batchNorm1(reshape_layer)
 
         prev_layer = self.activation(prev_layer)
-
-        
+ 
         prev_layer = self.apply_deconv1(prev_layer)
         prev_layer = self.batchNorm2(reshape_layer)
         prev_layer = self.activation(prev_layer)
@@ -253,10 +251,6 @@ class Generator(nn.Module):
         prev_layer = self.activation(prev_layer)
 
         prev_layer = self.apply_deconv3(prev_layer)
-        prev_layer = self.batchNorm4(reshape_layer)
-        prev_layer = self.activation(prev_layer)
-
-        prev_layer = self.apply_deconv4(prev_layer)
         prev_layer = prev_layer.reshape(prev_layer, (-1, 24, 24, 24, 167))
 
         final_activation = self.tanh(prev_layer)
