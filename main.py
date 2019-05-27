@@ -2,47 +2,43 @@ import torch.nn as nn
 import torch
 from torch import optim
 from models import *
-from data_loader import load_dataset
+from residue_dataset import ResidueDataset
 import torch.utils.data as utils_data
+import glob
 import numpy as np
 import os
+import random
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print("DEVICE IS {0}".format(str(device)))
 
-def train(net, dataloader, idx2map2d, optimizer, criterion, epoch, train_loss_file, model_file):
-    
+def train(net, dataloader, optimizer, criterion, epoch, train_loss_file, model_file):
+
     total_loss = 0.0
     running_loss = 0.0
+    num_total = 0.
+    num_correct = 0.
 
-    for i, data in enumerate(dataloader, 0):
-        indices, labels = data
-        inputs = []
-
+    for i, batch in enumerate(dataloader, 0):
+        inputs = batch['inputs']
+        labels = batch['labels']
         optimizer.zero_grad()
-        for idx in range(len(indices)):
-            map2d = idx2map2d[indices.data[idx].item()]
-            assert not np.isnan(map2d).any()
-            map4d = np.zeros((24, 24, 24, 167))
-            map4d[map2d[0,:],map2d[1,:],map2d[2,:],map2d[3,:]] = map2d[4,:]
-            inputs.append(map4d)
         inputs = torch.FloatTensor(inputs).to(device=device)
-        labels = labels.type(torch.FloatTensor).to(device=device)
+        labels = torch.FloatTensor(labels).to(device=device)
 
         # forward + backward + optimize
-        #net = net.to(device=device)
         outputs = net(inputs)
         loss = criterion(outputs, labels)
         loss.backward()
         optimizer.step()
 
-        # tanh = nn.Tanh()
-        # probabilities = tanh(outputs)
         for j in range(labels.size(0)):
             x = outputs[j].item()
             y = labels[j].item()
             print('TRAINING Label: {0:.3f}, predicted: {1:.3f}'.format(y, x))
- 
+            num_total += 1
+            if round(x) == round(y):
+                num_correct += 1
         total_loss += loss.item()
         running_loss += loss.item()
         if (i + 1) % 2 == 0:
@@ -58,66 +54,192 @@ def train(net, dataloader, idx2map2d, optimizer, criterion, epoch, train_loss_fi
         'loss': total_loss / (i+1),
     }, model_file)
 
-
     with open(train_loss_file, 'a+') as f:
-        f.write(str(epoch) + ', ' + str(total_loss/(i+1)) + '\n')
+        f.write(str(epoch) + ', ' + str(total_loss/(i+1)) + ', ' + str(num_correct / num_total) + '\n')
         print("EPOCH " + str(epoch) + ": total TRAINING loss is " + str(total_loss/(i+1)))
+        print("Accuracy", str(num_correct / num_total))
 
-def test(net, dataloader, idx2map2d, criterion, epoch, test_loss_file):
+
+def test(net, dataloader, criterion, epoch, test_loss_file):
     error = 0.
-    total = 0
     total_loss = 0.
+    num_total = 0.
+    num_correct = 0.
     with torch.no_grad():
-        for i, data in enumerate(dataloader, 0):
-            indices, labels = data
-            inputs = []
-            for idx in range(len(indices)):
-                map2d = idx2map2d[indices.data[idx].item()]
-                map4d = np.zeros((24, 24, 24, 167))
-                map4d[map2d[0,:],map2d[1,:],map2d[2,:],map2d[3,:]] = map2d[4,:]
-                inputs.append(map4d)
+        for i, batch in enumerate(dataloader, 0):
+            inputs = batch['inputs']
+            labels = batch['labels']
             inputs = torch.FloatTensor(inputs).to(device=device) 
-            labels = labels.type(torch.FloatTensor).to(device=device)
+            labels = torch.FloatTensor(labels).to(device=device)
             outputs = net(inputs)
             test_loss = criterion(outputs, labels)
             total_loss += test_loss.item()
 
-            # tanh = nn.Tanh()
-            # probabilities = tanh(outputs)
-            #values, predicted = torch.max(outputs.data, 1)
-            total += labels.size(0)
             for j in range(labels.size(0)):
                 x = outputs[j].item()
                 y = labels[j].item()
                 print('Test Label: {0:.3f}, predicted: {1:.3f}'.format(y, x))
                 error += abs(x - y)
-                #if (round(x) == y):
-                    #correct += 1
-    print('Average absolute-value error: ' + str(error / total))
-    #print('Total: ' + str(total))
+                num_total += 1
+                if round(x) == round(y):
+                    num_correct += 1
+
+    print('Average absolute-value error: ' + str(error / num_total))
     print('Test loss: ' + str(total_loss / (i+1)))
     with open(test_loss_file, 'a+') as f:
-        f.write(str(epoch) + ', ' + str(total_loss/(i+1)) + '\n')
+        f.write(str(epoch) + ', ' + str(total_loss/(i+1)) + ',' + str(num_correct / num_total) + '\n')
         print("EPOCH " + str(epoch) + ": total TEST loss is " + str(total_loss/(i+1)))
+        print("Accuracy", str(num_correct / num_total))
+
+
+# Write a list of .pkl files inside "pickle_dir" (including subdirectories) 
+# to "file_list_file" in a fixed order. Also returns the list of files.
+def produce_shuffled_file_list(pickle_dir, file_list_file, num_files=None):
+    file_list = glob.glob(pickle_dir + '/**/*.pkl', recursive=True)
+    random.shuffle(file_list)
+    if num_files is not None:
+        file_list = file_list[0:num_files]
+    
+    # Write to list to file
+    with open(file_list_file, 'w') as f:
+        for file_path in file_list:
+            f.write("%s\n" % file_path)
+    return file_list
+
+
+# Read file paths from a pre-existing "file list" file
+def read_file_list(file_list_file, num_files=None):
+    with open(file_list_file, 'r') as f:
+        file_list = f.readlines()
+        if num_files is not None:
+            file_list = file_list[0:num_files]
+        return file_list
 
 
 
 def main():
-    training_runs = 1  # Number of experiments
-    num_epochs = 10
+    training_runs = 10  # Number of experiments
+    num_epochs = 30
     fraction_test = 0.2
     fraction_validation = 0.2
-    model_prefix = 'discriminator_continuous_model_tiny'
-    true_files = 50
-    fake_files = 100
+
+    model_prefix = 'discriminator_discrete_v2'
+    num_true_files = 500
+    num_fake_files = 2000
 
     # True if we want to do binary classification. False if we want
     # to directly predict the continuous score.
-    discrete = False
+    discrete = True
 
-    # For fake structures, only include strucutres whose quality score is LESS than
+    # For fake structures, only include structures whose quality score is LESS than
     # this number
-    fake_upper_bound = None
+    fake_upper_bound = 0.5
+
+    # Get lists of files
+    true_file_list_file = 'true_files.txt'
+    fake_file_list_file = 'fake_files.txt'
+    if os.path.exists(true_file_list_file):
+        true_files = read_file_list(true_file_list_file)
+    else:
+        true_files = produce_shuffled_file_list('/net/scratch/aivan/decoys/ornate/pkl.natives')
+    if os.path.exists(fake_file_list_file):
+        fake_files = read_file_list(fake_file_list_file)
+    else:
+        fake_files = produce_shuffled_file_list('/net/scratch/aivan/decoys/ornate/pkl.rand70')  
+    true_files = true_files[:num_true_files]
+    fake_files = fake_files[:num_fake_files]
+
+    # Create a dataset for each file (true and fake)
+    all_datasets = []
+    true_examples = 0
+    for true_file in true_files:
+        true_dataset = ResidueDataset(true_file, label=1)
+        all_datasets.append(true_dataset)
+        true_examples += len(true_dataset)
+    fake_examples = 0
+    for fake_file in fake_files:
+        fake_dataset = ResidueDataset(fake_file, label=0, upper_bound=fake_upper_bound)
+        all_datasets.append(fake_dataset)
+        fake_examples += len(fake_dataset)
+    print('True examples', true_examples)
+    print('Fake examples', fake_examples)
+
+    # Create a combined dataset by concatenating the file datasets
+    full_dataset = utils_data.ConcatDataset(all_datasets)
+
+    # Split into train/validation/test
+    validation_size = int(fraction_validation * len(full_dataset))
+    test_size = int(fraction_test * len(full_dataset))
+    train_size = len(full_dataset) - validation_size - test_size
+    train_dataset, validation_dataset, test_dataset = torch.utils.data.random_split(full_dataset, [train_size, validation_size, test_size])
+
+    # Create DataLoaders from the datasets
+    train_dataloader = utils_data.DataLoader(train_dataset, batch_size=32, shuffle=True, num_workers=4)
+    validation_dataloader = utils_data.DataLoader(validation_dataset, batch_size=32, shuffle=True, num_workers=4)
+
+
+    for run in range(training_runs):
+        # Actually train the model
+        net = OrnateReplicaModel(15, device=device).to(device)
+        epoch = 0
+
+        train_loss_file = model_prefix + '_' + str(run) + '_train.csv'
+        test_loss_file = model_prefix + '_' + str(run) + '_test.csv'
+        model_file = model_prefix + '_' + str(run) + '_model'
+
+        # If we're doing (discrete) binary classification, use Binary cross-entropy loss.
+        # otherwise, use mean squared error or Huber loss (similar to mean squared error, but penalize outliers less)
+        if discrete:
+            criterion = nn.BCELoss()
+        else:
+            criterion = nn.MSELoss()
+            #criterion = nn.SmoothL1Loss()
+        optimizer = optim.Adam(net.parameters(), lr=0.001)
+
+        # If there is a partially-trained model already, just load it
+        if os.path.exists(model_file):
+            checkpoint = torch.load(model_file)
+            net.load_state_dict(checkpoint['model_state_dict'])
+            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            epoch = checkpoint['epoch'] + 1
+            loss = checkpoint['loss']
+
+        while epoch < num_epochs:
+            net.train()
+            train(net, train_dataloader, optimizer, criterion, epoch, train_loss_file, model_file)
+            # NOTE: Is this needed?
+            #net.eval()
+            test(net, validation_dataloader, criterion, epoch, test_loss_file)
+            epoch += 1
+
+if __name__=='__main__':
+    main()
+
+
+
+
+"""
+OLD CODE. IGNORE EVERYTHING BELOW THIS.
+
+        #indices, labels = data
+        #inputs = []
+
+        #for idx in range(len(indices)):
+            #map2d = idx2map2d[indices.data[idx].item()]
+            #print('Map2D:', map2d)
+
+            #assert not np.isnan(map2d).any()
+            #map4d = np.zeros((24, 24, 24, 167))
+            #map4d[map2d[0,:],map2d[1,:],map2d[2,:],map2d[3,:]] = map2d[4,:]
+            #inputs.append(map4d)
+
+            #indices, labels = data
+            #inputs = []
+            #for idx in range(len(indices)):
+                #map2d = idx2map2d[indices.data[idx].item()]
+                #map4d = np.zeros((24, 24, 24, 167))
+                #map4d[map2d[0,:],map2d[1,:],map2d[2,:],map2d[3,:]] = map2d[4,:]
+                #inputs.append(map4d)
 
     # Load true protein structures and fake modelled structures as TensorDataset
     trueX, trueY, true_idx2map2d = load_dataset('/net/scratch/aivan/decoys/ornate/pkl.natives', num_files=true_files)
@@ -158,43 +280,9 @@ def main():
     test_dataset = utils_data.TensorDataset(tensor_test_x, tensor_test_y)
 
     # Create DataLoaders to handle minibatching
-    train_dataloader = utils_data.DataLoader(train_dataset, batch_size=128, shuffle=True, num_workers=8)
-    validation_dataloader = utils_data.DataLoader(validation_dataset, batch_size=128, shuffle=True, num_workers=8)
-    test_dataloader = utils_data.DataLoader(test_dataset, batch_size=128, shuffle=True, num_workers=8)
+    train_dataloader = utils_data.DataLoader(train_dataset, batch_size=64, shuffle=True, num_workers=8)
+    validation_dataloader = utils_data.DataLoader(validation_dataset, batch_size=64, shuffle=True, num_workers=8)
+    test_dataloader = utils_data.DataLoader(test_dataset, batch_size=64, shuffle=True, num_workers=8)
+    """
 
 
-    for run in range(training_runs):
-        # Actually train the model
-        net = OrnateReplicaModel(15, device=device).to(device)
-        epoch = 0
-
-        train_loss_file = model_prefix + '_' + str(run) + '_train.csv'
-        test_loss_file = model_prefix + '_' + str(run) + '_test.csv'
-        model_file = model_prefix + '_' + str(run) + '_model'
-
-        # If we're doing (discrete) binary classification, use Binary cross-entropy loss.
-        # otherwise, use mean squared error or Huber loss (similar to mean squared error, but penalize outliers less)
-        if discrete:
-            criteron = nn.BCELoss()
-        else:
-            #criterion = nn.MSELoss()
-            criterion = nn.SmoothL1Loss()
-        optimizer = optim.Adam(net.parameters(), lr=0.001)
-
-        # If there is a partially-trained model already, just load it
-        if os.path.exists(model_file):
-            checkpoint = torch.load(model_file)
-            net.load_state_dict(checkpoint['model_state_dict'])
-            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-            epoch = checkpoint['epoch'] + 1
-            loss = checkpoint['loss']
-
-        while epoch < num_epochs:
-            #net.train()
-            train(net, train_dataloader, idx2map2d, optimizer, criterion, epoch, train_loss_file, model_file)
-            #net.eval()
-            test(net, validation_dataloader, idx2map2d, criterion, epoch, test_loss_file)
-            epoch += 1
-
-if __name__=='__main__':
-    main()
