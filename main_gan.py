@@ -17,18 +17,18 @@ print("DEVICE IS {0}".format(str(device)))
 class VAEGAN(nn.Module):
 
     # TODO: This has too many parameters :O
-    def train(self, netVAE, netG, netD, true_dataloader, fake_dataloader, optimizerVAE, optimizerG, optimizerD, epoch, loss_file, model_file):
+    def train(self, netVAE, netG, netD, real_dataloader, fake_dataloader, optimizerVAE, optimizerG, optimizerD, epoch, loss_file, model_file):
          
-        true_iter = iter(true_dataloader)
+        real_iter = iter(real_dataloader)
         fake_iter = iter(fake_dataloader)
         while True:
-            true_data = true_iter.next()
-            if not true_data:
+            real_data = real_iter.next()
+            if not real_data:
                 break
             fake_data = fake_iter.next()
             if not fake_data:
                 break
-            true_data = true_data['inputs'].to(device)
+            real_data = real_data['inputs'].to(device)
             fake_data = fake_data['inputs'].to(device)
             batch_size = fake_data.shape[0]
 
@@ -48,12 +48,13 @@ class VAEGAN(nn.Module):
 
             # Now, use the generator to generate a structure from a random
             # latent vector sampled from Normal(0, 1).
+            z = torch.randn((batch_size, 400)).to(device) 
             G_train = netG(z)
 
             # Score the generated structure with the discriminator
             D_fake = netD(G_train)
 
-            # Score the true (native) structure with the discriminator
+            # Score the real (native) structure with the discriminator
             D_legit = netD(real_data)
 
             ###################################################################
@@ -61,7 +62,7 @@ class VAEGAN(nn.Module):
             # discriminator (at interpolated structures between the generated and real 
             # ones) to be close to 1.
             ###################################################################
-            alpha = torch.rand((batch_size, 1)) # Sample from Uniform(0, 1)
+            alpha = torch.rand((batch_size, 1)).to(device) # Sample from Uniform(0, 1)
             difference = G_train - real_data
             inter = []
             for i in range(batch_size):
@@ -160,7 +161,7 @@ class VAEGAN(nn.Module):
         model_prefix = 'gan_1'
 
         # TODO: When model works, drastically increase this
-        num_true_files = 5
+        num_real_files = 5
         num_fake_files = 20
 
         # For fake structures, only include structures whose quality score is LESS than
@@ -168,30 +169,30 @@ class VAEGAN(nn.Module):
         fake_upper_bound = 0.5
 
         # Get lists of files
-        true_file_list_file = 'output/file_lists/true_files.txt'
+        real_file_list_file = 'output/file_lists/real_files.txt'
         fake_file_list_file = 'output/file_lists/fake_files.txt'
-        if os.path.exists(true_file_list_file):
-            true_files = read_file_list(true_file_list_file)
+        if os.path.exists(real_file_list_file):
+            real_files = read_file_list(real_file_list_file)
         else:
-            true_files = produce_shuffled_file_list('/net/scratch/aivan/decoys/ornate/pkl.natives', true_file_list_file)
+            real_files = produce_shuffled_file_list('/net/scratch/aivan/decoys/ornate/pkl.natives', real_file_list_file)
         if os.path.exists(fake_file_list_file):
             fake_files = read_file_list(fake_file_list_file)
         else:
             fake_files = produce_shuffled_file_list('/net/scratch/aivan/decoys/ornate/pkl.rand70', fake_file_list_file)  
-        true_files = true_files[:num_true_files]
+        real_files = real_files[:num_real_files]
         fake_files = fake_files[:num_fake_files]
 
 
         # TODO: All this needs to be redone if it turns out that there
-        # is a mapping between the true and fake data
+        # is a mapping between the real and fake data
 
-        # Create a dataset for each file (true and fake)
-        true_datasets = []
-        true_examples = 0
-        for true_file in true_files:
-            true_dataset = ResidueDataset(true_file, label=1)
-            true_datasets.append(true_dataset)
-            true_examples += len(true_dataset)
+        # Create a dataset for each file (real and fake)
+        real_datasets = []
+        real_examples = 0
+        for real_file in real_files:
+            real_dataset = ResidueDataset(real_file, label=1)
+            real_datasets.append(real_dataset)
+            real_examples += len(real_dataset)
 
         fake_datasets = []
         fake_examples = 0
@@ -199,18 +200,18 @@ class VAEGAN(nn.Module):
             fake_dataset = ResidueDataset(fake_file, label=0, upper_bound=fake_upper_bound)
             fake_datasets.append(fake_dataset)
             fake_examples += len(fake_dataset)
-        print('True examples', true_examples)
+        print('Real examples', real_examples)
         print('Fake examples', fake_examples)
 
         # Create combined datasets by concatenating the file datasets
         fake_full_dataset = utils_data.ConcatDataset(fake_datasets)
-        true_full_dataset = utils_data.ConcatDataset(true_datasets)
+        real_full_dataset = utils_data.ConcatDataset(real_datasets)
 
         # Split into train/validation/test for real data
-        true_validation_size = int(fraction_validation * len(true_full_dataset))
-        true_test_size = int(fraction_test * len(true_full_dataset))
-        true_train_size = len(true_full_dataset) - true_validation_size - true_test_size
-        true_train_dataset, true_validation_dataset, true_test_dataset = torch.utils.data.random_split(true_full_dataset, [true_train_size, true_validation_size, true_test_size])
+        real_validation_size = int(fraction_validation * len(real_full_dataset))
+        real_test_size = int(fraction_test * len(real_full_dataset))
+        real_train_size = len(real_full_dataset) - real_validation_size - real_test_size
+        real_train_dataset, real_validation_dataset, real_test_dataset = torch.utils.data.random_split(real_full_dataset, [real_train_size, real_validation_size, real_test_size])
 
         fake_validation_size = int(fraction_validation * len(fake_full_dataset))
         fake_test_size = int(fraction_test * len(fake_full_dataset))
@@ -219,7 +220,7 @@ class VAEGAN(nn.Module):
 
 
         # Create DataLoaders from the datasets
-        true_train_dataloader = utils_data.DataLoader(true_train_dataset, batch_size=8, shuffle=True, num_workers=2)
+        real_train_dataloader = utils_data.DataLoader(real_train_dataset, batch_size=8, shuffle=True, num_workers=2)
         fake_train_dataloader = utils_data.DataLoader(fake_train_dataset, batch_size=8, shuffle=True, num_workers=2)
 
         for run in range(training_runs):
@@ -254,7 +255,7 @@ class VAEGAN(nn.Module):
                 #loss = checkpoint['loss']
 
             while epoch < num_epochs:
-                self.train(netVAE, netG, netD, true_train_dataloader, fake_train_dataloader, optimizerVAE, optimizerG, optimizerD, epoch, loss_file, model_file)
+                self.train(netVAE, netG, netD, real_train_dataloader, fake_train_dataloader, optimizerVAE, optimizerG, optimizerD, epoch, loss_file, model_file)
                 #test(net, validation_dataloader, criterion, epoch, test_loss_file)
                 epoch += 1     
 

@@ -107,7 +107,7 @@ def main():
     fraction_validation = 0.2
 
     model_prefix = 'discriminator_discrete_v2'
-    num_true_files = 500
+    num_real_files = 500
     num_fake_files = 2000
 
     # True if we want to do binary classification. False if we want
@@ -119,32 +119,32 @@ def main():
     fake_upper_bound = 0.5
 
     # Get lists of files
-    true_file_list_file = 'output/file_lists/true_files.txt'
+    real_file_list_file = 'output/file_lists/real_files.txt'
     fake_file_list_file = 'output/file_lists/fake_files.txt'
-    if os.path.exists(true_file_list_file):
-        true_files = read_file_list(true_file_list_file)
+    if os.path.exists(real_file_list_file):
+        real_files = read_file_list(real_file_list_file)
     else:
-        true_files = produce_shuffled_file_list('/net/scratch/aivan/decoys/ornate/pkl.natives', true_file_list_file)
+        real_files = produce_shuffled_file_list('/net/scratch/aivan/decoys/ornate/pkl.natives', real_file_list_file)
     if os.path.exists(fake_file_list_file):
         fake_files = read_file_list(fake_file_list_file)
     else:
         fake_files = produce_shuffled_file_list('/net/scratch/aivan/decoys/ornate/pkl.rand70', fake_file_list_file)  
-    true_files = true_files[:num_true_files]
+    real_files = real_files[:num_real_files]
     fake_files = fake_files[:num_fake_files]
 
-    # Create a dataset for each file (true and fake)
+    # Create a dataset for each file (real and fake)
     all_datasets = []
-    true_examples = 0
-    for true_file in true_files:
-        true_dataset = ResidueDataset(true_file, label=1)
-        all_datasets.append(true_dataset)
-        true_examples += len(true_dataset)
+    real_examples = 0
+    for real_file in real_files:
+        real_dataset = ResidueDataset(real_file, label=1)
+        all_datasets.append(real_dataset)
+        real_examples += len(real_dataset)
     fake_examples = 0
     for fake_file in fake_files:
         fake_dataset = ResidueDataset(fake_file, label=0, upper_bound=fake_upper_bound)
         all_datasets.append(fake_dataset)
         fake_examples += len(fake_dataset)
-    print('True examples', true_examples)
+    print('True examples', real_examples)
     print('Fake examples', fake_examples)
 
     # Create a combined dataset by concatenating the file datasets
@@ -224,18 +224,18 @@ OLD CODE. IGNORE EVERYTHING BELOW THIS.
                 #map4d[map2d[0,:],map2d[1,:],map2d[2,:],map2d[3,:]] = map2d[4,:]
                 #inputs.append(map4d)
 
-    # Load true protein structures and fake modelled structures as TensorDataset
-    trueX, trueY, true_idx2map2d = load_dataset('/net/scratch/aivan/decoys/ornate/pkl.natives', num_files=true_files)
-    fakeX, fakeY, fake_idx2map2d = load_dataset('/net/scratch/aivan/decoys/ornate/pkl.rand70', num_files=fake_files, starting_index=len(trueX))    
+    # Load real protein structures and fake modelled structures as TensorDataset
+    realX, realY, real_idx2map2d = load_dataset('/net/scratch/aivan/decoys/ornate/pkl.natives', num_files=real_files)
+    fakeX, fakeY, fake_idx2map2d = load_dataset('/net/scratch/aivan/decoys/ornate/pkl.rand70', num_files=fake_files, starting_index=len(realX))    
 
     # If discrete, for the fake/modeled structures, make the label 0
     if discrete:
         fakeY = np.zeros_like(fakeX)
 
-    # Concatenate true structures and fake ones, and shuffle them
+    # Concatenate real structures and fake ones, and shuffle them
     # to train the discriminator
-    numpyX = np.asarray(np.concatenate((trueX, fakeX)))
-    numpyY = np.asarray(np.concatenate((trueY, fakeY))).reshape(-1, 1)
+    numpyX = np.asarray(np.concatenate((realX, fakeX)))
+    numpyY = np.asarray(np.concatenate((realY, fakeY))).reshape(-1, 1)
 
     # Shuffle
     indices = np.arange(numpyX.shape[0])
@@ -243,9 +243,9 @@ OLD CODE. IGNORE EVERYTHING BELOW THIS.
     numpyX = numpyX[indices]
     numpyY = numpyY[indices]
 
-    # Also concatenate the two dictionaries of (true, modelled) structures
+    # Also concatenate the two dictionaries of (real, modelled) structures
     # (each structure is stored in the 2D representation here)
-    idx2map2d = {**true_idx2map2d, **fake_idx2map2d}
+    idx2map2d = {**real_idx2map2d, **fake_idx2map2d}
 
     # Split data into training/validation/test
     validation_start = int((1 - fraction_test - fraction_validation) * len(numpyX))
