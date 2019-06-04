@@ -94,6 +94,13 @@ def test(net, dataloader, criterion, epoch, test_loss_file):
 
 
 def main():
+    # Create necessary output directories if they don't exist already 
+    output_dirs = ['output/models', 'output/discriminator_loss', 'output/file_lists']
+    for output_dir in output_dirs:
+        os.makedirs(output_dir, exist_ok=True)
+
+
+
     training_runs = 10  # Number of experiments
     num_epochs = 30
     fraction_test = 0.2
@@ -112,8 +119,8 @@ def main():
     fake_upper_bound = 0.5
 
     # Get lists of files
-    true_file_list_file = 'true_files.txt'
-    fake_file_list_file = 'fake_files.txt'
+    true_file_list_file = 'output/file_lists/true_files.txt'
+    fake_file_list_file = 'output/file_lists/fake_files.txt'
     if os.path.exists(true_file_list_file):
         true_files = read_file_list(true_file_list_file)
     else:
@@ -159,9 +166,9 @@ def main():
         net = Discriminator(15, device=device).to(device)
         epoch = 0
 
-        train_loss_file = model_prefix + '_' + str(run) + '_train.csv'
-        test_loss_file = model_prefix + '_' + str(run) + '_test.csv'
-        model_file = model_prefix + '_' + str(run) + '_model'
+        train_loss_file = 'output/discriminator_loss/' + model_prefix + '_' + str(run) + '_train.csv'
+        test_loss_file = 'output/discriminator_loss/' + model_prefix + '_' + str(run) + '_test.csv'
+        model_file = 'output/models/' + model_prefix + '_' + str(run) + '_model'
 
         # If we're doing (discrete) binary classification, use Binary cross-entropy loss.
         # otherwise, use mean squared error or Huber loss (similar to mean squared error, but penalize outliers less)
