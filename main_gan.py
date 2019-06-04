@@ -67,10 +67,13 @@ class VAEGAN(nn.Module):
             inter = []
             for i in range(batch_size):
                 inter.append(difference[i] * alpha[i])
-            inter = torch.unbind(inter)
+            inter = torch.stack(inter)  # TODO This is tf.unstack, figure out what's the best Pytorch replacement
+
+            interpolates = ...
+            gradients = ...
 
             # TODO: Check if this is the correct conversion from Tensorflow
-            slopes = torch.sqrt(torch.square(gradients).sum(axis=1))
+            slopes = torch.sqrt((gradients**2).sum(axis=1))
             gradient_penalty = ((slopes - 1.)**2).mean()
 
             #################################################################################
@@ -85,12 +88,12 @@ class VAEGAN(nn.Module):
             # NOTE: In this code, "sigma" is actually the LOG standard deviation.
             # The reason we do "exp(2*sigmas)" is because
             # "exp(2 * log(sigma)) = exp(log(sigma^2)) = sigma^2"
-            kl_loss = (-sigmas + 0.5*(torch.exp(2.*sigmas) + torch.square(means) - 1.)).mean()
+            kl_loss = (-sigmas + 0.5*(torch.exp(2.*sigmas) + means**2 - 1.)).mean()
 
             # Reconstruction error between the real protein structure and our generated structure.
             # This tests the quality of our refinement.
             # QUESTION: is there a mapping between the fake (modeled) and real (native) structures?
-            recon_loss = (torch.square(real_data - G_dec)).mean()
+            recon_loss = ((real_data - G_dec) ** 2).mean()
 
             # Discriminator loss. Discriminator should give a high score to real structures
             # (D_legit) and a low score to generated structures (D_fake). Note that here,
