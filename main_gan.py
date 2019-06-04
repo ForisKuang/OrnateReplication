@@ -68,8 +68,10 @@ class VAEGAN(nn.Module):
             for i in range(batch_size):
                 inter.append(difference[i] * alpha[i])
             inter = torch.unbind(inter)
+            interpolates = real_data + inter
 
             # TODO: Check if this is the correct conversion from Tensorflow
+            gradients = torch.autograd.grad(netD(interpolates), interpolates)
             slopes = torch.sqrt(torch.square(gradients).sum(axis=1))
             gradient_penalty = ((slopes - 1.)**2).mean()
 
