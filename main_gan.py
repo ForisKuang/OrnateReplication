@@ -39,7 +39,7 @@ class VAEGAN(nn.Module):
             means, sigmas = netVAE(fake_data)
 
             # Sample latent vector z_x from a Gaussian with the mean/variance returned by surface VAE
-            eps = torch.randn((batch_size, 200)).to(device)
+            eps = torch.randn((batch_size, 400)).to(device)
             z_x = means + sigmas * eps
 
             # Structure produced by generator (decoder) from the initial fake structure
@@ -146,6 +146,11 @@ class VAEGAN(nn.Module):
 
 
     def main(self):
+        # Create necessary output directories if they don't exist already 
+        output_dirs = ['output/models', 'output/gan_loss', 'output/file_lists']
+        for output_dir in output_dirs:
+            os.makedirs(output_dir, exist_ok=True)
+
         training_runs = 1  # Number of experiments
         num_epochs = 50  # Number of epochs to train the discriminator. Note that the generator is only updated every 5th epoch.
 
