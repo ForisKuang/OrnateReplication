@@ -226,22 +226,23 @@ class Generator(nn.Module):
         self.batchNorm1 = nn.BatchNorm3d(self.DECONV0)
         self.batchNorm2 = nn.BatchNorm3d(self.DECONV1)
         self.batchNorm3 = nn.BatchNorm3d(self.DECONV2)
-        self.apply_deconv1 = self.deconv(self.DECONV0, self.DECONV1, 4, stride=2)  # [batch size * 3 * 3 * 3 * 20] --> [batch size * 6 * 6 * 6 * 40]
-        self.apply_deconv2 = self.deconv(self.DECONV1, self.DECONV2, 4, stride=2)  # [batch size * 6 * 6 * 6 * 40] --> [batch size * 12 * 12 * 12 * 80]
-        self.apply_deconv3 = self.deconv(self.DECONV2, self.DECONV3, 4, stride=2)  # [batch size * 12 * 12 * 12 * 80] --> [batch size * 24 * 24 * 24 * 167]
+        self.apply_deconv1 = self.deconv(self.DECONV0, self.DECONV1, 4, stride=2, padding=1)  # [batch size * 3 * 3 * 3 * 20] --> [batch size * 6 * 6 * 6 * 40]
+        self.apply_deconv2 = self.deconv(self.DECONV1, self.DECONV2, 4, stride=2, padding=1)  # [batch size * 6 * 6 * 6 * 40] --> [batch size * 12 * 12 * 12 * 80]
+        self.apply_deconv3 = self.deconv(self.DECONV2, self.DECONV3, 4, stride=2, padding=1)  # [batch size * 12 * 12 * 12 * 80] --> [batch size * 24 * 24 * 24 * 167]
 
         # Default dropout is set to 0.5
         self.dropout = nn.Dropout()
 
-    def deconv(self, in_dim, out_dim, kernel_size, stride=1):
-        return nn.ConvTranspose3d(in_dim, out_dim, kernel_size=kernel_size, padding=0,
+    def deconv(self, in_dim, out_dim, kernel_size, stride=1, padding=0):
+        return nn.ConvTranspose3d(in_dim, out_dim, kernel_size=kernel_size, padding=padding,
                 stride=stride, bias=False)
 
     def forward(self, features):
         
         start_layer = self.linear1(features)
-        
-        reshape_layer = torch.reshape(start_layer, (-1, 3, 3, 3, 20))
+
+        # In Pytorch, the "channel" dimension (20) needs to come before the height/width/depth
+        reshape_layer = torch.reshape(start_layer, (-1, 20, 3, 3, 3))
 
         prev_layer = self.batchNorm1(reshape_layer)
 
@@ -256,7 +257,8 @@ class Generator(nn.Module):
         prev_layer = self.activation(prev_layer)
 
         prev_layer = self.apply_deconv3(prev_layer)
-        prev_layer = torch.reshape(prev_layer, (-1, 24, 24, 24, 167))
+        prev_layer = torch.reshape(prev_layer, (-1, 167, 24, 24, 24))
+        prev_layer = prev_layer.permute(0, 2, 3, 4, 1)
 
         final_activation = self.tanh(prev_layer)
 

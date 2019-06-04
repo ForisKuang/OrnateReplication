@@ -219,8 +219,8 @@ class VAEGAN(nn.Module):
 
 
         # Create DataLoaders from the datasets
-        true_train_dataloader = utils_data.DataLoader(true_train_dataset, batch_size=32, shuffle=True, num_workers=4)
-        fake_train_dataloader = utils_data.DataLoader(fake_train_dataset, batch_size=32, shuffle=True, num_workers=4)
+        true_train_dataloader = utils_data.DataLoader(true_train_dataset, batch_size=8, shuffle=True, num_workers=2)
+        fake_train_dataloader = utils_data.DataLoader(fake_train_dataset, batch_size=8, shuffle=True, num_workers=2)
 
         for run in range(training_runs):
             # Create networks
