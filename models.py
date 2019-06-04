@@ -207,7 +207,7 @@ class Generator(nn.Module):
 
     def __init__(self, num_retype=15, device='cpu'):
         super(Generator, self).__init__()
-        self.num_retype = num_retype
+        iself.num_retype = num_retype
         self.activation = nn.ReLU()
         self.sig = nn.Sigmoid()
         self.tanh = nn.Tanh()
@@ -256,3 +256,5 @@ class Generator(nn.Module):
         final_activation = self.tanh(prev_layer)
 
         return final_activation
+
+
