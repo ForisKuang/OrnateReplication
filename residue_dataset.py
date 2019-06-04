@@ -31,7 +31,7 @@ class ResidueDataset(Dataset):
         self.data = []  # Residues
         self.labels = []  # Labels (quality score)
         
-        with open(pkl_file, 'rb') as f:
+        with open(pkl_file.strip(), 'rb') as f:
             protein = pickle.load(f, encoding='latin1')
             features = protein['features']
             scores = protein['scores']

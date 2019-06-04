@@ -32,9 +32,9 @@ class VAEGAN(nn.Module):
             fake_data = fake_data['inputs'].to(device)
             batch_size = fake_data.shape[0]
 
-            #################################################################################
+            ###################################################################
             # Forward pass through the network
-            #################################################################################
+            ###################################################################
             # Feed fake data through VAE encoder to get mean/variance vectors
             means, sigmas = netVAE(fake_data)
 
@@ -56,11 +56,11 @@ class VAEGAN(nn.Module):
             # Score the true (native) structure with the discriminator
             D_legit = netD(real_data)
 
-            #################################################################################
+            ###################################################################
             # Compute gradient penalty. Goal is to push the L2-norm of the gradient of the
             # discriminator (at interpolated structures between the generated and real 
             # ones) to be close to 1.
-            #################################################################################
+            ###################################################################
             alpha = torch.rand((batch_size, 1)) # Sample from Uniform(0, 1)
             difference = G_train - real_data
             inter = []
@@ -163,8 +163,8 @@ class VAEGAN(nn.Module):
         fake_upper_bound = 0.5
 
         # Get lists of files
-        true_file_list_file = 'true_files.txt'
-        fake_file_list_file = 'fake_files.txt'
+        true_file_list_file = 'output/file_lists/true_files.txt'
+        fake_file_list_file = 'output/file_lists/fake_files.txt'
         if os.path.exists(true_file_list_file):
             true_files = read_file_list(true_file_list_file)
         else:
@@ -217,8 +217,6 @@ class VAEGAN(nn.Module):
         true_train_dataloader = utils_data.DataLoader(true_train_dataset, batch_size=32, shuffle=True, num_workers=4)
         fake_train_dataloader = utils_data.DataLoader(fake_train_dataset, batch_size=32, shuffle=True, num_workers=4)
 
-
-
         for run in range(training_runs):
             # Create networks
             netVAE = SurfaceVAE(device=device).to(device)
@@ -232,10 +230,10 @@ class VAEGAN(nn.Module):
  
             epoch = 0
 
-            loss_file = model_prefix + '_' + str(run) + '_loss.csv'
+            loss_file = 'output/gan_loss/' + model_prefix + '_' + str(run) + '_loss.csv'
             with open(loss_file, 'w') as f:
                 f.write('epoch, kl_loss, recon_loss, d_loss, g_loss')
-            model_file = model_prefix + '_' + str(run) + '_model'
+            model_file = 'output/model/' + model_prefix + '_' + str(run) + '_model'
 
             # If there is a partially-trained model already, just load it
             #if os.path.exists(model_file):
