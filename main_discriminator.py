@@ -2,6 +2,7 @@ import torch.nn as nn
 import torch
 from torch import optim
 from models import *
+from file_list_utils import produce_shuffled_file_list, read_file_list
 from residue_dataset import ResidueDataset
 import torch.utils.data as utils_data
 import glob
@@ -92,31 +93,6 @@ def test(net, dataloader, criterion, epoch, test_loss_file):
         print("Accuracy", str(num_correct / num_total))
 
 
-# Write a list of .pkl files inside "pickle_dir" (including subdirectories) 
-# to "file_list_file" in a fixed order. Also returns the list of files.
-def produce_shuffled_file_list(pickle_dir, file_list_file, num_files=None):
-    file_list = glob.glob(pickle_dir + '/**/*.pkl', recursive=True)
-    random.shuffle(file_list)
-    if num_files is not None:
-        file_list = file_list[0:num_files]
-    
-    # Write to list to file
-    with open(file_list_file, 'w') as f:
-        for file_path in file_list:
-            f.write("%s\n" % file_path)
-    return file_list
-
-
-# Read file paths from a pre-existing "file list" file
-def read_file_list(file_list_file, num_files=None):
-    with open(file_list_file, 'r') as f:
-        file_list = f.readlines()
-        if num_files is not None:
-            file_list = file_list[0:num_files]
-        return file_list
-
-
-
 def main():
     training_runs = 10  # Number of experiments
     num_epochs = 30
@@ -141,11 +117,11 @@ def main():
     if os.path.exists(true_file_list_file):
         true_files = read_file_list(true_file_list_file)
     else:
-        true_files = produce_shuffled_file_list('/net/scratch/aivan/decoys/ornate/pkl.natives')
+        true_files = produce_shuffled_file_list('/net/scratch/aivan/decoys/ornate/pkl.natives', true_file_list_file)
     if os.path.exists(fake_file_list_file):
         fake_files = read_file_list(fake_file_list_file)
     else:
-        fake_files = produce_shuffled_file_list('/net/scratch/aivan/decoys/ornate/pkl.rand70')  
+        fake_files = produce_shuffled_file_list('/net/scratch/aivan/decoys/ornate/pkl.rand70', fake_file_list_file)  
     true_files = true_files[:num_true_files]
     fake_files = fake_files[:num_fake_files]
 

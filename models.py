@@ -7,7 +7,7 @@ import numpy as np
 
 class Discriminator(nn.Module):
 
-    def __init__(self, num_retype=15):
+    def __init__(self, num_retype=15, device='cpu'):
         super(Discriminator, self).__init__()
         self.num_retype = num_retype
         self.activation = nn.ReLU()
@@ -33,6 +33,7 @@ class Discriminator(nn.Module):
         # Default dropout is set to 0.5 which is the same as Ornate
         self.dropout = nn.Dropout()
         self.avgpool3d = nn.AvgPool3d(4, stride=4)
+        self.device = device
 
     def conv(self, in_dim, out_dim, kernel_size, stride=1):
         return nn.Conv3d(in_dim, out_dim, kernel_size=kernel_size, padding=0,
@@ -41,7 +42,7 @@ class Discriminator(nn.Module):
     def forward(self, features):
 
         # Retyper: a [high dimension * low dimension] tensor
-        retyper_matrix = torch.nn.Parameter(torch.rand(self.NB_TYPE, self.num_retype), requires_grad=True)
+        retyper_matrix = torch.nn.Parameter(torch.rand(self.NB_TYPE, self.num_retype), requires_grad=True).to(self.device)
 
         # (batch_size, 24, 24, 24, 167)
         shape = features.shape
@@ -109,11 +110,11 @@ class Discriminator(nn.Module):
 
 class SurfaceVAE(nn.Module):
 
-    def __init__(self, num_retype=15):
+    def __init__(self, num_retype=15, device='cpu'):
         super(SurfaceVAE, self).__init__()
         self.num_retype = num_retype
         self.activation = nn.LeakyReLU()
-        self.means_activation = nn.Identity()
+        #self.means_activation = nn.Identity()
         self.sigmas_activation = nn.Tanh()
         self.CONV1 = 20
         self.CONV2 = 30
@@ -123,15 +124,18 @@ class SurfaceVAE(nn.Module):
         self.batchNorm1 = nn.BatchNorm3d(self.CONV2)
         self.batchNorm2 = nn.BatchNorm3d(self.CONV3)
         self.batchNorm3 = nn.BatchNorm3d(self.CONV4)
-        
-        
+
         self.apply_conv1 = self.conv(self.num_retype, self.CONV1, 3, stride=1, padding=1)
         self.apply_conv2 = self.conv(self.CONV1, self.CONV2, 4, stride=2, padding=1)
         self.apply_conv3 = self.conv(self.CONV2, self.CONV3, 4, stride=2, padding=1)
         self.apply_conv4 = self.conv(self.CONV3, self.CONV4, 4, stride=2, padding=1)
-        
+
+        self.means_linear = nn.Linear(20*3*3*3, 400)
+        self.sigmas_linear = nn.Linear(20*3*3*3, 400)
+
         # Default dropout is set to 0.5
         self.dropout = nn.Dropout()
+        self.device = device
 
     def conv(self, in_dim, out_dim, kernel_size, stride=1, padding=0):
         return nn.Conv3d(in_dim, out_dim, kernel_size=kernel_size, padding=padding,
@@ -140,14 +144,14 @@ class SurfaceVAE(nn.Module):
     def forward(self, features):
 
         # Retyper: a [high dimension * low dimension] tensor
-        retyper_matrix = torch.nn.Parameter(torch.rand(self.NB_TYPE, self.num_retype), requires_grad=True)
+        retyper_matrix = torch.nn.Parameter(torch.rand(self.NB_TYPE, self.num_retype), requires_grad=True).to(self.device)
 
         # (batch_size, 24, 24, 24, 167)
         shape = features.shape
 
         # Reshape so that we have a two-dimensional tensor.
         # Each row will represent an (x,y,z) point, which has a 167-dimensional feature vector.
-        prev_layer = torch.reshape(features, (-1, self.NB_TYPE))
+        prev_layer = torch.reshape(features, (-1, self.NB_TYPE)).to(self.device)
 
         # Multiply each (x,y,z) point's feature vector by the retyper matrix,
         # to reduce the dimensionality of the feature vectors
@@ -198,10 +202,10 @@ class SurfaceVAE(nn.Module):
         # Flatten layer with respect to Batch Size
         prev_layer = prev_layer.reshape(prev_layer.size()[0], -1)
 
-        means = nn.Linear(prev_layer.size()[1], 200)(prev_layer)
-        means = self.means_activation(means)
+        means = self.means_linear(prev_layer)
+        #means = self.means_activation(means)
 
-        sigmas = nn.Linear(prev_layer.size()[1], 200)(prev_layer)
+        sigmas = self.sigmas_linear(prev_layer)
         sigmas = self.sigmas_activation(sigmas)
 
         return means, sigmas
@@ -210,7 +214,7 @@ class Generator(nn.Module):
 
     def __init__(self, num_retype=15):
         super(Generator, self).__init__()
-        iself.num_retype = num_retype
+        self.num_retype = num_retype
         self.activation = nn.ReLU()
         self.sig = nn.Sigmoid()
         self.tanh = nn.Tanh()
@@ -221,7 +225,6 @@ class Generator(nn.Module):
         self.batchNorm1 = nn.BatchNorm3d(self.DECONV1)
         self.batchNorm2 = nn.BatchNorm3d(self.DECONV2)
         self.batchNorm3 = nn.BatchNorm3d(self.DECONV3)
-        self.batchNorm3 = nn.BatchNorm3d(self.DECONV4)
         self.apply_deconv1 = self.deconv(self.DECONV0, self.DECONV1, 4, stride=2)  # [batch size * 3 * 3 * 3 * 20] --> [batch size * 6 * 6 * 6 * 40]
         self.apply_deconv2 = self.deconv(self.DECONV1, self.DECONV2, 4, stride=2)  # [batch size * 6 * 6 * 6 * 40] --> [batch size * 12 * 12 * 12 * 80]
         self.apply_deconv3 = self.deconv(self.DECONV2, self.DECONV3, 4, stride=2)  # [batch size * 12 * 12 * 12 * 80] --> [batch size * 24 * 24 * 24 * 167]
@@ -235,7 +238,7 @@ class Generator(nn.Module):
 
     def forward(self, features):
         
-        start_layer = nn.Linear(200, 20*3*3*3)(features)
+        start_layer = nn.Linear(400, 20*3*3*3)(features)
         
         reshape_layer = start_layer.reshape(start_layer, (-1, 3, 3, 3, 20))
 
