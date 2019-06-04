@@ -1,32 +1,143 @@
+import torch.nn as nn
+import torch
+from torch import optim
+from models import *
+from residue_dataset import ResidueDataset
+import torch.utils.data as utils_data
+import glob
+import numpy as np
+import os
+import random
 
-
-
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print("DEVICE IS {0}".format(str(device)))
 
 
 class VAEGAN(nn.Module):
-    def __init__(self, device, size):
-        self.device = device
-        self.size = size
-
-
 
     def main():
-        # TODO: Load data
-        dataloader = ????
-        netVAE = SurfaceVAE().to(self.device)
-        netG = Generator().to(self.device)
-        netD = Discriminator().to(self.device)
+        training_runs = 1  # Number of experiments
+        num_epochs = 50  # Number of epochs to train the discriminator. Note that the generator is only updated every 5th epoch.
+
+        fraction_test = 0.2
+        fraction_validation = 0.2
+
+        model_prefix = 'gan_1'
+
+        # TODO: When model works, drastically increase this
+        num_true_files = 5
+        num_fake_files = 20
+
+        # For fake structures, only include structures whose quality score is LESS than
+        # this number
+        fake_upper_bound = 0.5
+
+        # Get lists of files
+        true_file_list_file = 'true_files.txt'
+        fake_file_list_file = 'fake_files.txt'
+        if os.path.exists(true_file_list_file):
+            true_files = read_file_list(true_file_list_file)
+        else:
+            true_files = produce_shuffled_file_list('/net/scratch/aivan/decoys/ornate/pkl.natives')
+        if os.path.exists(fake_file_list_file):
+            fake_files = read_file_list(fake_file_list_file)
+        else:
+            fake_files = produce_shuffled_file_list('/net/scratch/aivan/decoys/ornate/pkl.rand70')  
+        true_files = true_files[:num_true_files]
+        fake_files = fake_files[:num_fake_files]
 
 
 
+        # TODO: All this needs to be redone if it turns out that there
+        # is a mapping between the true and fake data
 
-    # TODO: Make this work with DataLoaders. Right now this method
-    # only takes in one batch.
-    def train(self, netVAE, netG, netD, dataloader):
-       
-        for i, data in enumerate(dataloader, 0):
-            fake_data = batch['fake']
-            real_data = batch['real']
+        # Create a dataset for each file (true and fake)
+        true_datasets = []
+        true_examples = 0
+        for true_file in true_files:
+            true_dataset = ResidueDataset(true_file, label=1)
+            true_datasets.append(true_dataset)
+            true_examples += len(true_dataset)
+
+        fake_datasets = []
+        fake_examples = 0
+        for fake_file in fake_files:
+            fake_dataset = ResidueDataset(fake_file, label=0, upper_bound=fake_upper_bound)
+            fake_datasets.append(fake_dataset)
+            fake_examples += len(fake_dataset)
+        print('True examples', true_examples)
+        print('Fake examples', fake_examples)
+
+        # Create combined datasets by concatenating the file datasets
+        fake_full_dataset = utils_data.ConcatDataset(fake_datasets)
+        true_full_dataset = utils_data.ConcatDataset(true_datasets)
+
+        # Split into train/validation/test for real data
+        true_validation_size = int(fraction_validation * len(true_full_dataset))
+        true_test_size = int(fraction_test * len(true_full_dataset))
+        true_train_size = len(true_full_dataset) - true_validation_size - true_test_size
+        true_train_dataset, true_validation_dataset, true_test_dataset = torch.utils.data.random_split(true_full_dataset, [true_train_size, true_validation_size, true_test_size])
+
+        fake_validation_size = int(fraction_validation * len(fake_full_dataset))
+        fake_test_size = int(fraction_test * len(fake_full_dataset))
+        fake_train_size = len(fake_full_dataset) - fake_validation_size - fake_test_size
+        fake_train_dataset, fake_validation_dataset, fake_test_dataset = torch.utils.data.random_split(fake_full_dataset, [fake_train_size, fake_validation_size, fake_test_size])
+
+
+        # Create DataLoaders from the datasets
+        true_train_dataloader = utils_data.DataLoader(true_train_dataset, batch_size=32, shuffle=True, num_workers=4)
+        fake_train_dataloader = utils_data.DataLoader(fake_train_dataset, batch_size=32, shuffle=True, num_workers=4)
+
+
+
+        for run in range(training_runs):
+            # Create networks
+            netVAE = SurfaceVAE().to(device)
+            netG = Generator().to(device)
+            netD = Discriminator().to(device)
+            
+            # Create optimizers
+            optimizerVAE = optim.Adam(netVAE.parameters(), lr=0.001)
+            optimizerG = optim.Adam(netG.parameters(), lr=0.001)
+            optimizerD = optim.Adam(netD.parameters(), lr=0.001)
+ 
+            epoch = 0
+
+            loss_file = model_prefix + '_' + str(run) + '_loss.csv'
+            with open(loss_file, 'w') as f:
+                f.write('epoch, kl_loss, recon_loss, d_loss, g_loss')
+            model_file = model_prefix + '_' + str(run) + '_model'
+
+            # If there is a partially-trained model already, just load it
+            #if os.path.exists(model_file):
+                #checkpoint = torch.load(model_file)
+                #netVAE.load_state_dict(checkpoint['VAE_state_dict'])
+                #netG.load_state_dict(checkpoint['G_state_dict'])
+                #netD.load_state_dict(checkpoint['D_state_dict'])
+
+                #optimizerVAE.load_state_dict(checkpoint['optimizerVAE_state_dict'])
+                #optimizerG.load_state_dict(checkpoint['optimizerG_state_dict'])
+                #optimizerD.load_state_dict(checkpoint['optimizerD_state_dict'])
+                #epoch = checkpoint['epoch'] + 1
+                #loss = checkpoint['loss']
+
+            while epoch < num_epochs:
+                train(netVAE, netG, netD, true_train_dataloader, fake_train_dataloader, optimizerVAE, optimizerG, optimizerD, epoch, loss_file, model_file)
+                #test(net, validation_dataloader, criterion, epoch, test_loss_file)
+                epoch += 1
+
+     
+
+
+    # TODO: This has too many parameters :O
+    def train(self, netVAE, netG, netD, true_dataloader, fake_dataloader, optimizerVAE, optimizerG, optimizerD, epoch, loss_file, model_file):
+         
+        # TODO This is a total hack - since we could have different
+        # lengths of true/fake data. If there is a mapping between
+        # true/fake data we should use that.
+        for i in range(min(len(true_dataloader), len(fake_dataloader)):
+            true_data = true_dataloader[i]
+            fake_data = fake_dataloader[i]
             batch_size = fake_data.shape[0]
 
             # Batch sizes for real/fake data must be equal
@@ -111,6 +222,36 @@ class VAEGAN(nn.Module):
             ################################################################################
             # Optimization
             ################################################################################
-            # TODO Create optimizers on the various losses and actually train them. 5 generator epochs for each discriminator epoch (I think, check the paper)
+            # Compute gradients w.r.t. discriminator, VAE, and reconstruction loss, and update the discriminator & VAE
+            d_loss.backward()
+            v_loss.backward()
+            recon_loss.backward()
+            optimizerD.step()
+            optimizerVAE.step()
 
- 
+            # Every 5th batch, compute gradient w.r.t generator loss and update the generator
+            if i % 5 == 0:
+                g_loss.backward()
+                recon_loss.backward()
+                optimizerG.step()
+
+            # Save network to file so that it can be reused
+            torch.save({
+                'epoch': epoch,
+                'VAE_state_dict': netVAE.state_dict(),
+                'G_state_dict': netG.state_dict(),
+                'D_state_dict': netD.state_dict(),
+                'optimizerVAE_state_dict': optimizerVAE.state_dict(),
+                'optimizerG_state_dict': optimizerG.state_dict(),
+                'optimizerD_state_dict': optimizerD.state_dict(),
+                'loss': total_loss / (i+1),
+            }, model_file)
+
+            # Write losses to file
+            with open(loss_file, 'a+') as f:
+                f.write(str(epoch) + ', ' + str(kl_loss.item()) + ', ' + str(recon_loss.item()) + ', ' + str(d_loss.item()) + ', ' + str(g_loss.item()) + '\n') 
+
+
+
+    if __name__ == '__main__':
+        main()

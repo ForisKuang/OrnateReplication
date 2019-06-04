@@ -5,10 +5,10 @@ from torch.autograd import Variable
 from torch import optim
 import numpy as np
 
-class OrnateReplicaModel(nn.Module):
+class Discriminator(nn.Module):
 
-    def __init__(self, num_retype=15, device='cpu'):
-        super(OrnateReplicaModel, self).__init__()
+    def __init__(self, num_retype=15):
+        super(Discriminator, self).__init__()
         self.num_retype = num_retype
         self.activation = nn.ReLU()
         self.final_activation = nn.Sigmoid()
@@ -17,6 +17,10 @@ class OrnateReplicaModel(nn.Module):
         self.CONV3 = 20
         self.NB_TYPE = 167
         self.NB_DIMOUT = 4*4*4*self.CONV3
+        
+        
+        # TODO: Page 3 of the 3D-IWGAN paper suggests not using Batch norm for discriminator.
+        # But it's present in the Pytorch GAN tutorial...
         self.batchNorm1 = nn.BatchNorm3d(self.CONV1)
         self.batchNorm2 = nn.BatchNorm3d(self.CONV2)
         self.batchNorm1d = nn.BatchNorm1d(self.NB_DIMOUT)
@@ -29,8 +33,6 @@ class OrnateReplicaModel(nn.Module):
         # Default dropout is set to 0.5 which is the same as Ornate
         self.dropout = nn.Dropout()
         self.avgpool3d = nn.AvgPool3d(4, stride=4)
-        self.device = device
-        print('model device: ' + str(self.device))
 
     def conv(self, in_dim, out_dim, kernel_size, stride=1):
         return nn.Conv3d(in_dim, out_dim, kernel_size=kernel_size, padding=0,
@@ -39,7 +41,7 @@ class OrnateReplicaModel(nn.Module):
     def forward(self, features):
 
         # Retyper: a [high dimension * low dimension] tensor
-        retyper_matrix = torch.nn.Parameter(torch.rand(self.NB_TYPE, self.num_retype, device=self.device), requires_grad=True)
+        retyper_matrix = torch.nn.Parameter(torch.rand(self.NB_TYPE, self.num_retype), requires_grad=True)
 
         # (batch_size, 24, 24, 24, 167)
         shape = features.shape
@@ -107,7 +109,7 @@ class OrnateReplicaModel(nn.Module):
 
 class SurfaceVAE(nn.Module):
 
-    def __init__(self, num_retype=15, device='cpu'):
+    def __init__(self, num_retype=15):
         super(SurfaceVAE, self).__init__()
         self.num_retype = num_retype
         self.activation = nn.LeakyReLU()
@@ -121,14 +123,15 @@ class SurfaceVAE(nn.Module):
         self.batchNorm1 = nn.BatchNorm3d(self.CONV2)
         self.batchNorm2 = nn.BatchNorm3d(self.CONV3)
         self.batchNorm3 = nn.BatchNorm3d(self.CONV4)
+        
+        
         self.apply_conv1 = self.conv(self.num_retype, self.CONV1, 3, stride=1, padding=1)
         self.apply_conv2 = self.conv(self.CONV1, self.CONV2, 4, stride=2, padding=1)
         self.apply_conv3 = self.conv(self.CONV2, self.CONV3, 4, stride=2, padding=1)
         self.apply_conv4 = self.conv(self.CONV3, self.CONV4, 4, stride=2, padding=1)
+        
         # Default dropout is set to 0.5
         self.dropout = nn.Dropout()
-        self.device = device
-        print('model device: ' + str(self.device))
 
     def conv(self, in_dim, out_dim, kernel_size, stride=1, padding=0):
         return nn.Conv3d(in_dim, out_dim, kernel_size=kernel_size, padding=padding,
@@ -137,7 +140,7 @@ class SurfaceVAE(nn.Module):
     def forward(self, features):
 
         # Retyper: a [high dimension * low dimension] tensor
-        retyper_matrix = torch.nn.Parameter(torch.rand(self.NB_TYPE, self.num_retype, device=self.device), requires_grad=True)
+        retyper_matrix = torch.nn.Parameter(torch.rand(self.NB_TYPE, self.num_retype), requires_grad=True)
 
         # (batch_size, 24, 24, 24, 167)
         shape = features.shape
@@ -205,7 +208,7 @@ class SurfaceVAE(nn.Module):
 
 class Generator(nn.Module):
 
-    def __init__(self, num_retype=15, device='cpu'):
+    def __init__(self, num_retype=15):
         super(Generator, self).__init__()
         iself.num_retype = num_retype
         self.activation = nn.ReLU()
@@ -225,8 +228,6 @@ class Generator(nn.Module):
 
         # Default dropout is set to 0.5
         self.dropout = nn.Dropout()
-        self.device = device
-        print('model device: ' + str(self.device))
 
     def deconv(self, in_dim, out_dim, kernel_size, stride=1):
         return nn.ConvTranspose3d(in_dim, out_dim, kernel_size=kernel_size, padding=0,
