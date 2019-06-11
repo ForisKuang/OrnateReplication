@@ -16,27 +16,26 @@ class Discriminator(nn.Module):
         self.CONV2 = 30
         self.CONV3 = 20
         self.NB_TYPE = 1
-        self.NB_DIMOUT = 4*4*4*self.CONV3
-        
-        
+        self.NB_DIMOUT = 4*4*4*self.CONV3    
+
         # TODO: Page 3 of the 3D-IWGAN paper suggests not using Batch norm for discriminator.
         # But it's present in the Pytorch GAN tutorial...
         self.batchNorm1 = nn.BatchNorm3d(self.CONV1)
         self.batchNorm2 = nn.BatchNorm3d(self.CONV2)
         self.batchNorm1d = nn.BatchNorm1d(self.NB_DIMOUT)
-        self.apply_conv1 = self.conv(self.num_retype, self.CONV1, 3)
-        self.apply_conv2 = self.conv(self.CONV1, self.CONV2, 4)
-        self.apply_conv3 = self.conv(self.CONV2, self.CONV3, 3)
+        self.apply_conv1 = self.conv(self.num_retype, self.CONV1, 3, stride=2, padding=1)
+        self.apply_conv2 = self.conv(self.CONV1, self.CONV2, 4, stride=2, padding=1)
+        self.apply_conv3 = self.conv(self.CONV2, self.CONV3, 3, stride=2, padding=1)
         self.lin1 = nn.Linear(self.NB_DIMOUT, 512)
         self.lin2 = nn.Linear(512, 200)
         self.lin3 = nn.Linear(200, 1)
         # Default dropout is set to 0.5 which is the same as Ornate
         self.dropout = nn.Dropout()
-        self.avgpool3d = nn.AvgPool3d(4, stride=4)
+        self.avgpool3d = nn.AvgPool3d(4, stride=1, padding=1)
         self.device = device
 
-    def conv(self, in_dim, out_dim, kernel_size, stride=1):
-        return nn.Conv3d(in_dim, out_dim, kernel_size=kernel_size, padding=0,
+    def conv(self, in_dim, out_dim, kernel_size, stride=1, padding=1):
+        return nn.Conv3d(in_dim, out_dim, kernel_size=kernel_size, padding=padding,
                 stride=stride, bias=False)
 
     def forward(self, features):
@@ -75,7 +74,7 @@ class Discriminator(nn.Module):
 
         # Apply activation function
         prev_layer = self.activation(prev_layer)
-        
+
         # Apply second convolution with kernel size 4
         prev_layer = self.apply_conv2(prev_layer)
         
@@ -94,8 +93,8 @@ class Discriminator(nn.Module):
         # Apply activation function
         prev_layer = self.activation(prev_layer)
 
-        prev_layer = self.avgpool3d(prev_layer)
-
+        #prev_layer = self.avgpool3d(prev_layer)
+        print('Point 0', prev_layer.size())
         prev_layer = prev_layer.reshape(prev_layer.size()[0], -1)
         prev_layer = self.lin1(prev_layer)
         prev_layer = F.relu(prev_layer)
@@ -130,8 +129,8 @@ class SurfaceVAE(nn.Module):
         self.apply_conv3 = self.conv(self.CONV2, self.CONV3, 4, stride=2, padding=1)
         self.apply_conv4 = self.conv(self.CONV3, self.CONV4, 4, stride=2, padding=1)
 
-        self.means_linear = nn.Linear(20*3*3*3, 400)
-        self.sigmas_linear = nn.Linear(20*3*3*3, 400)
+        self.means_linear = nn.Linear(20*4*4*4, 400)
+        self.sigmas_linear = nn.Linear(20*4*4*4, 400)
 
         # Default dropout is set to 0.5
         self.dropout = nn.Dropout()
@@ -218,11 +217,11 @@ class Generator(nn.Module):
         self.activation = nn.ReLU()
         self.sig = nn.Sigmoid()
         self.tanh = nn.Tanh()
-        self.DECONV0 = 20
-        self.DECONV1 = 40
-        self.DECONV2 = 80
+        self.DECONV0 = 1
+        self.DECONV1 = 1
+        self.DECONV2 = 1
         self.DECONV3 = 1
-        self.linear1 = nn.Linear(400, 20*3*3*3)
+        self.linear1 = nn.Linear(400, 20*4*4*4)
         self.batchNorm1 = nn.BatchNorm3d(self.DECONV0)
         self.batchNorm2 = nn.BatchNorm3d(self.DECONV1)
         self.batchNorm3 = nn.BatchNorm3d(self.DECONV2)
@@ -243,7 +242,7 @@ class Generator(nn.Module):
         start_layer = self.linear1(features)
 
         # In Pytorch, the "channel" dimension (20) needs to come before the height/width/depth
-        reshape_layer = torch.reshape(start_layer, (-1, 20, 3, 3, 3))
+        reshape_layer = torch.reshape(start_layer, (-1, 1, 4, 4, 4))
 
         prev_layer = self.batchNorm1(reshape_layer)
 

@@ -3,7 +3,7 @@ import torch
 from torch import optim
 from models import *
 from file_list_utils import produce_shuffled_file_list, read_file_list
-from residue_dataset import ShapeNetsDataset
+from residue_dataset import ResidueDataset
 from ShapeNets_dataset import ShapeNetsDataset
 import torch.utils.data as utils_data
 import glob
@@ -32,6 +32,7 @@ class VAEGAN(nn.Module):
             real_data = real_data['inputs'].to(device)
             fake_data = fake_data['inputs'].to(device)
             batch_size = fake_data.shape[0]
+            print('Batch_size', batch_size)
 
             ###################################################################
             # Forward pass through the network
@@ -64,6 +65,8 @@ class VAEGAN(nn.Module):
             # ones) to be close to 1.
             ###################################################################
             alpha = torch.rand((batch_size, 1)).to(device) # Sample from Uniform(0, 1)
+            print('G_train', G_train.shape)
+            print('real_data', real_data.shape)
             difference = G_train - real_data
             inter = []
             for i in range(batch_size):
@@ -189,11 +192,11 @@ class VAEGAN(nn.Module):
         if os.path.exists(real_file_list_file):
             real_files = read_file_list(real_file_list_file)
         else:
-            real_files = produce_shuffled_file_list('~/3D-IWGAN/3D-Generation/data/train/chair/', real_file_list_file)
+            real_files = produce_shuffled_file_list('/home/forisk/3D-IWGAN/3D-Generation/data/train/chair/', real_file_list_file)
         if os.path.exists(fake_file_list_file):
             fake_files = read_file_list(fake_file_list_file)
         else:
-            fake_files = produce_shuffled_file_list('~/3D-IWGAN/3D-Reconstruction-Kinect/data/train/chair/', fake_file_list_file)  
+            fake_files = produce_shuffled_file_list('/home/forisk/3D-IWGAN/3D-Reconstruction-Kinect/data/train/chair/', fake_file_list_file)  
         real_files = real_files[:num_real_files]
         fake_files = fake_files[:num_fake_files]
 
