@@ -15,7 +15,7 @@ class Discriminator(nn.Module):
         self.CONV1 = 20
         self.CONV2 = 30
         self.CONV3 = 20
-        self.NB_TYPE = 167
+        self.NB_TYPE = 1
         self.NB_DIMOUT = 4*4*4*self.CONV3
         
         
@@ -120,7 +120,7 @@ class SurfaceVAE(nn.Module):
         self.CONV2 = 30
         self.CONV3 = 20
         self.CONV4 = 20
-        self.NB_TYPE = 167
+        self.NB_TYPE = 1
         self.batchNorm1 = nn.BatchNorm3d(self.CONV2)
         self.batchNorm2 = nn.BatchNorm3d(self.CONV3)
         self.batchNorm3 = nn.BatchNorm3d(self.CONV4)
@@ -221,7 +221,7 @@ class Generator(nn.Module):
         self.DECONV0 = 20
         self.DECONV1 = 40
         self.DECONV2 = 80
-        self.DECONV3 = 167
+        self.DECONV3 = 1
         self.linear1 = nn.Linear(400, 20*3*3*3)
         self.batchNorm1 = nn.BatchNorm3d(self.DECONV0)
         self.batchNorm2 = nn.BatchNorm3d(self.DECONV1)
@@ -232,6 +232,7 @@ class Generator(nn.Module):
 
         # Default dropout is set to 0.5
         self.dropout = nn.Dropout()
+        self.dim = 32
 
     def deconv(self, in_dim, out_dim, kernel_size, stride=1, padding=0):
         return nn.ConvTranspose3d(in_dim, out_dim, kernel_size=kernel_size, padding=padding,
@@ -257,7 +258,7 @@ class Generator(nn.Module):
         prev_layer = self.activation(prev_layer)
 
         prev_layer = self.apply_deconv3(prev_layer)
-        prev_layer = torch.reshape(prev_layer, (-1, 167, 24, 24, 24))
+        prev_layer = torch.reshape(prev_layer, (-1, 1, self.dim, self.dim, self.dim))
         prev_layer = prev_layer.permute(0, 2, 3, 4, 1)
 
         final_activation = self.tanh(prev_layer)

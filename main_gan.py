@@ -3,7 +3,8 @@ import torch
 from torch import optim
 from models import *
 from file_list_utils import produce_shuffled_file_list, read_file_list
-from residue_dataset import ResidueDataset
+from residue_dataset import ShapeNetsDataset
+from ShapeNets_dataset import ShapeNetsDataset
 import torch.utils.data as utils_data
 import glob
 import numpy as np
@@ -171,8 +172,9 @@ class VAEGAN(nn.Module):
         fake_upper_bound = 0.5
 
         # Get lists of files
-        real_file_list_file = 'output/file_lists/real_files.txt'
-        fake_file_list_file = 'output/file_lists/fake_files.txt'
+        real_file_list_file = 'output/file_lists/real_chairs.txt'
+        fake_file_list_file = 'output/file_lists/fake_chairs.txt'
+        """
         if os.path.exists(real_file_list_file):
             real_files = read_file_list(real_file_list_file)
         else:
@@ -181,6 +183,17 @@ class VAEGAN(nn.Module):
             fake_files = read_file_list(fake_file_list_file)
         else:
             fake_files = produce_shuffled_file_list('/net/scratch/aivan/decoys/ornate/pkl.rand70', fake_file_list_file)  
+        real_files = real_files[:num_real_files]
+        fake_files = fake_files[:num_fake_files]
+            """
+        if os.path.exists(real_file_list_file):
+            real_files = read_file_list(real_file_list_file)
+        else:
+            real_files = produce_shuffled_file_list('~/3D-IWGAN/3D-Generation/data/train/chair/', real_file_list_file)
+        if os.path.exists(fake_file_list_file):
+            fake_files = read_file_list(fake_file_list_file)
+        else:
+            fake_files = produce_shuffled_file_list('~/3D-IWGAN/3D-Reconstruction-Kinect/data/train/chair/', fake_file_list_file)  
         real_files = real_files[:num_real_files]
         fake_files = fake_files[:num_fake_files]
 
@@ -192,14 +205,14 @@ class VAEGAN(nn.Module):
         real_datasets = []
         real_examples = 0
         for real_file in real_files:
-            real_dataset = ResidueDataset(real_file, label=1)
+            real_dataset = ShapeNetsDataset(real_file, label=1)
             real_datasets.append(real_dataset)
             real_examples += len(real_dataset)
 
         fake_datasets = []
         fake_examples = 0
         for fake_file in fake_files:
-            fake_dataset = ResidueDataset(fake_file, label=0, upper_bound=fake_upper_bound)
+            fake_dataset = ShapeNetsDataset(fake_file, label=0, upper_bound=fake_upper_bound)
             fake_datasets.append(fake_dataset)
             fake_examples += len(fake_dataset)
         print('Real examples', real_examples)
