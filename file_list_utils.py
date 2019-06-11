@@ -4,7 +4,7 @@ import random
 # Write a list of .pkl files inside "pickle_dir" (including subdirectories) 
 # to "file_list_file" in a fixed order. Also returns the list of files.
 def produce_shuffled_file_list(pickle_dir, file_list_file, num_files=None):
-    file_list = glob.glob(pickle_dir + '/**/*.pkl', recursive=True)
+    file_list = glob.glob(pickle_dir + '/**/*.npy', recursive=True)
     random.shuffle(file_list)
     if num_files is not None:
         file_list = file_list[0:num_files]
@@ -22,6 +22,7 @@ def read_file_list(file_list_file, num_files=None):
         file_list = f.readlines()
         if num_files is not None:
             file_list = file_list[0:num_files]
+        file_list = [ f.strip() for f in file_list ]
         return file_list
 
 
