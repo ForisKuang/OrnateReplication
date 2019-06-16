@@ -31,10 +31,9 @@ class VAEGAN(nn.Module):
                 break
             real_data = real_data['inputs'].to(device)
             fake_data = fake_data['inputs'].to(device)
-            batch_size = fake_data.shape[0]
-            print('Batch_size', batch_size)
-            print('Data shape', real_data.shape)
-            exit(1)
+            batch_size = min(fake_data.shape[0], real_data.shape[0])
+            real_data = real_data[0:batch_size]
+            fake_data = fake_data[0:batch_size]
 
             ###################################################################
             # Forward pass through the network
@@ -249,9 +248,9 @@ class VAEGAN(nn.Module):
 
         for run in range(training_runs):
             # Create networks
-            netVAE = SurfaceVAE(device=device).to(device)
+            netVAE = SurfaceVAE(device=device, num_retype=1).to(device)
             netG = Generator().to(device)
-            netD = Discriminator(device=device).to(device)
+            netD = Discriminator(device=device, num_retype=1).to(device)
             
             # Create optimizers
             optimizerVAE = optim.Adam(netVAE.parameters(), lr=0.001)

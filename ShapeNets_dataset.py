@@ -29,8 +29,9 @@ class ShapeNetsDataset(Dataset):
         whose scores fall within that range.
         """
         self.data = np.load(filename)  # 3D Shape Nets
+        self.data = np.expand_dims(self.data, 4)
         print('Data shape', self.data.shape)
-        self.labels = [label] * data.shape[0]  # Labels (quality score)
+        self.labels = [label] * self.data.shape[0]  # Labels (quality score)
         
     def __len__(self):
         return 1
