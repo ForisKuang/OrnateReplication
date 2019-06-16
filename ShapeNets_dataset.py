@@ -10,7 +10,7 @@ from sklearn.utils import shuffle
 
 
 class ShapeNetsDataset(Dataset):
-    def __init__(self, filename, lower_bound=None, upper_bound=None, label=None):
+    def __init__(self, filename, label, lower_bound=None, upper_bound=None):
         """
         Initializes a dataset for the given pickle file.
         
@@ -29,7 +29,8 @@ class ShapeNetsDataset(Dataset):
         whose scores fall within that range.
         """
         self.data = np.load(filename)  # 3D Shape Nets
-        self.labels = [1]  # Labels (quality score)
+        print('Data shape', self.data.shape)
+        self.labels = [label] * data.shape[0]  # Labels (quality score)
         
     def __len__(self):
         return 1

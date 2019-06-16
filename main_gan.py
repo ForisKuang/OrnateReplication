@@ -33,6 +33,8 @@ class VAEGAN(nn.Module):
             fake_data = fake_data['inputs'].to(device)
             batch_size = fake_data.shape[0]
             print('Batch_size', batch_size)
+            print('Data shape', real_data.shape)
+            exit(1)
 
             ###################################################################
             # Forward pass through the network
@@ -178,6 +180,8 @@ class VAEGAN(nn.Module):
         real_file_list_file = 'output/file_lists/real_chairs.txt'
         fake_file_list_file = 'output/file_lists/fake_chairs.txt'
         """
+        Load data of protein residues
+
         if os.path.exists(real_file_list_file):
             real_files = read_file_list(real_file_list_file)
         else:
@@ -189,6 +193,8 @@ class VAEGAN(nn.Module):
         real_files = real_files[:num_real_files]
         fake_files = fake_files[:num_fake_files]
             """
+
+
         if os.path.exists(real_file_list_file):
             real_files = read_file_list(real_file_list_file)
         else:
@@ -215,7 +221,7 @@ class VAEGAN(nn.Module):
         fake_datasets = []
         fake_examples = 0
         for fake_file in fake_files:
-            fake_dataset = ShapeNetsDataset(fake_file, label=0, upper_bound=fake_upper_bound)
+            fake_dataset = ShapeNetsDataset(fake_file, label=0) #, upper_bound=fake_upper_bound)
             fake_datasets.append(fake_dataset)
             fake_examples += len(fake_dataset)
         print('Real examples', real_examples)
