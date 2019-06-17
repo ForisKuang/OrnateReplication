@@ -18,17 +18,19 @@ print("DEVICE IS {0}".format(str(device)))
 class VAEGAN(nn.Module):
 
     # TODO: This has too many parameters :O
-    def train(self, netVAE, netG, netD, real_dataloader, fake_dataloader, optimizerVAE, optimizerG, optimizerD, epoch, loss_file, model_file):
-         
+    def train(self, netVAE, netG, netD, real_dataloader, fake_dataloader, optimizerVAE, optimizerG, optimizerD, epoch, loss_file, model_file, generated_output_dir): 
         real_iter = iter(real_dataloader)
         fake_iter = iter(fake_dataloader)
         while True:
-            real_data = real_iter.next()
-            if not real_data:
-                break
-            fake_data = fake_iter.next()
-            if not fake_data:
-                break
+            try:
+                real_data = real_iter.next()
+                if not real_data:
+                    break
+                fake_data = fake_iter.next()
+                if not fake_data:
+                    break
+            except StopIteration:
+                return
             real_data = real_data['inputs'].to(device)
             fake_data = fake_data['inputs'].to(device)
             batch_size = min(fake_data.shape[0], real_data.shape[0])
@@ -66,19 +68,17 @@ class VAEGAN(nn.Module):
             # ones) to be close to 1.
             ###################################################################
             alpha = torch.rand((batch_size, 1)).to(device) # Sample from Uniform(0, 1)
-            print('G_train', G_train.shape)
-            print('real_data', real_data.shape)
             difference = G_train - real_data
             inter = []
             for i in range(batch_size):
                 inter.append(difference[i] * alpha[i])
-            inter = torch.unbind(inter)
+            inter = torch.stack(inter)
             interpolates = real_data + inter
 
             # TODO: Check if this is the correct conversion from Tensorflow
-            gradients = torch.autograd.grad(netD(interpolates), interpolates)
-            slopes = torch.sqrt(torch.square(gradients).sum(axis=1))
-            gradient_penalty = ((slopes - 1.)**2).mean()
+            gradients = torch.autograd.grad(netD(interpolates).mean(), interpolates, retain_graph=True)[0]
+            slopes = torch.sqrt((gradients ** 2).sum())
+            gradient_penalty = ((slopes - 1.)**2)
 
             #################################################################################
             # Loss calculations
@@ -123,16 +123,15 @@ class VAEGAN(nn.Module):
             optimizerVAE.zero_grad()
             optimizerG.zero_grad()
             optimizerD.zero_grad()
-            d_loss.backward()
-            v_loss.backward()
-            recon_loss.backward()
+            d_loss.backward(retain_graph=True)
+            v_loss.backward(retain_graph=True)
+            recon_loss.backward(retain_graph=True)
             optimizerD.step()
             optimizerVAE.step()
 
             # Every 5th batch, compute gradient w.r.t generator loss and update the generator
             if i % 5 == 0:
                 g_loss.backward()
-                recon_loss.backward()
                 optimizerG.step()
 
             # Save network to file so that it can be reused
@@ -150,12 +149,19 @@ class VAEGAN(nn.Module):
             with open(loss_file, 'a+') as f:
                 f.write(str(epoch) + ', ' + str(kl_loss.item()) + ', ' + str(recon_loss.item()) + ', ' + str(d_loss.item()) + ', ' + str(g_loss.item()) + '\n') 
 
-
+        # Write generated outputs to file
+        for i in range(len(G_dec)):
+            file_path = os.path.join(generated_output_dir, 'epoch_' + str(epoch) + '_gen_decoded_' + str(i) + '.npy')
+            print('file_path', file_path)
+            np.save(file_path, G_dec[i])
+        for i in range(len(G_train)):
+            file_path = os.path.join(generated_output_dir, 'epoch_' + str(epoch) + '_gen_random_' + str(i) + '.npy')
+            np.save(file_path, G_train[i])
 
 
     def main(self):
         # Create necessary output directories if they don't exist already 
-        output_dirs = ['output/models', 'output/gan_loss', 'output/file_lists']
+        output_dirs = ['output/models', 'output/gan_loss', 'output/file_lists', 'output/generated']
         for output_dir in output_dirs:
             os.makedirs(output_dir, exist_ok=True)
 
@@ -168,8 +174,8 @@ class VAEGAN(nn.Module):
         model_prefix = 'gan_1'
 
         # TODO: When model works, drastically increase this
-        num_real_files = 5
-        num_fake_files = 20
+        num_real_files = 5000
+        num_fake_files = 5000
 
         # For fake structures, only include structures whose quality score is LESS than
         # this number
@@ -261,9 +267,9 @@ class VAEGAN(nn.Module):
 
             loss_file = 'output/gan_loss/' + model_prefix + '_' + str(run) + '_loss.csv'
             with open(loss_file, 'w') as f:
-                f.write('epoch, kl_loss, recon_loss, d_loss, g_loss')
-            model_file = 'output/model/' + model_prefix + '_' + str(run) + '_model'
-
+                f.write('epoch, kl_loss, recon_loss, d_loss, g_loss\n')
+            model_file = 'output/models/' + model_prefix + '_' + str(run) + '_model'
+            generated_output_dir = 'output/generated/'
             # If there is a partially-trained model already, just load it
             #if os.path.exists(model_file):
                 #checkpoint = torch.load(model_file)
@@ -278,9 +284,11 @@ class VAEGAN(nn.Module):
                 #loss = checkpoint['loss']
 
             while epoch < num_epochs:
-                self.train(netVAE, netG, netD, real_train_dataloader, fake_train_dataloader, optimizerVAE, optimizerG, optimizerD, epoch, loss_file, model_file)
+                print('Epoch', epoch)
+                self.train(netVAE, netG, netD, real_train_dataloader, fake_train_dataloader, optimizerVAE, optimizerG, optimizerD, epoch, loss_file, model_file, generated_output_dir)
                 #test(net, validation_dataloader, criterion, epoch, test_loss_file)
                 epoch += 1     
+
 
 
 if __name__ == '__main__':

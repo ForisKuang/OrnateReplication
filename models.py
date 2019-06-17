@@ -48,8 +48,6 @@ class Discriminator(nn.Module):
         # Toy data: (batch_size, 32, 32, 32, 1)
         shape = features.shape
         retyped = features
-        print('Input dimensions to Discriminator ', retyped.shape)
-
 
         # Reshape so that we have a two-dimensional tensor.
         # Each row will represent an (x,y,z) point, which has a 167-dimensional feature vector.
@@ -101,7 +99,6 @@ class Discriminator(nn.Module):
         prev_layer = self.activation(prev_layer)
 
         #prev_layer = self.avgpool3d(prev_layer)
-        print('Point 0', prev_layer.size())
         prev_layer = prev_layer.reshape(prev_layer.size()[0], -1)
         prev_layer = self.lin1(prev_layer)
         prev_layer = F.relu(prev_layer)
@@ -111,7 +108,7 @@ class Discriminator(nn.Module):
         prev_layer = self.lin3(prev_layer)
 
         # Apply sigmoid at the end
-        prev_layer = self.final_activation(prev_layer)
+        prev_layer = self.final_activation(prev_layer).squeeze()
         return prev_layer
 
 class SurfaceVAE(nn.Module):
@@ -152,8 +149,6 @@ class SurfaceVAE(nn.Module):
         # (batch_size, 24, 24, 24, 167)
         shape = features.shape
         retyped = features
-        print('Input dimensions to SurfaceVAE ', retyped.shape)
-
 
         # Reshape so that we have a two-dimensional tensor.
         # Each row will represent an (x,y,z) point, which has a 167-dimensional feature vector.
