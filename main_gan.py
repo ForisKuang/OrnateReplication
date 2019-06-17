@@ -30,7 +30,7 @@ class VAEGAN(nn.Module):
                 if not fake_data:
                     break
             except StopIteration:
-                return
+                break
             real_data = real_data['inputs'].to(device)
             fake_data = fake_data['inputs'].to(device)
             batch_size = min(fake_data.shape[0], real_data.shape[0])
@@ -150,13 +150,13 @@ class VAEGAN(nn.Module):
                 f.write(str(epoch) + ', ' + str(kl_loss.item()) + ', ' + str(recon_loss.item()) + ', ' + str(d_loss.item()) + ', ' + str(g_loss.item()) + '\n') 
 
         # Write generated outputs to file
-        for i in range(len(G_dec)):
+        for i in range(G_dec.shape[0]):
             file_path = os.path.join(generated_output_dir, 'epoch_' + str(epoch) + '_gen_decoded_' + str(i) + '.npy')
             print('file_path', file_path)
-            np.save(file_path, G_dec[i])
-        for i in range(len(G_train)):
+            np.save(file_path, G_dec[i].cpu().detach())
+        for i in range(G_train.shape[0]):
             file_path = os.path.join(generated_output_dir, 'epoch_' + str(epoch) + '_gen_random_' + str(i) + '.npy')
-            np.save(file_path, G_train[i])
+            np.save(file_path, G_train[i].cpu().detach())
 
 
     def main(self):
