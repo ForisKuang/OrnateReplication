@@ -130,7 +130,7 @@ class VAEGAN(nn.Module):
             optimizerVAE.step()
 
             # Every 5th batch, compute gradient w.r.t generator loss and update the generator
-            if i % 5 == 0:
+            if i % 1 == 0:
                 g_loss.backward()
                 optimizerG.step()
 
@@ -149,7 +149,7 @@ class VAEGAN(nn.Module):
             with open(loss_file, 'a+') as f:
                 f.write(str(epoch) + ', ' + str(kl_loss.item()) + ', ' + str(recon_loss.item()) + ', ' + str(d_loss.item()) + ', ' + str(g_loss.item()) + '\n') 
 
-        # Write generated outputs to file
+        # Write example generated outputs to file
         for i in range(G_dec.shape[0]):
             file_path = os.path.join(generated_output_dir, 'epoch_' + str(epoch) + '_gen_decoded_' + str(i) + '.npy')
             print('file_path', file_path)
@@ -174,8 +174,8 @@ class VAEGAN(nn.Module):
         model_prefix = 'gan_1'
 
         # TODO: When model works, drastically increase this
-        num_real_files = 5000
-        num_fake_files = 5000
+        num_real_files = 20000
+        num_fake_files = 20000
 
         # For fake structures, only include structures whose quality score is LESS than
         # this number
@@ -194,7 +194,7 @@ class VAEGAN(nn.Module):
         if os.path.exists(fake_file_list_file):
             fake_files = read_file_list(fake_file_list_file)
         else:
-            fake_files = produce_shuffled_file_list('/net/scratch/aivan/decoys/ornate/pkl.rand70', fake_file_list_file)  
+            fake_files = produce_shuffled_file_list('/net/scratch/aivan/decoys/ornate/pkl.rand70', fake_file_list_file)
         real_files = real_files[:num_real_files]
         fake_files = fake_files[:num_fake_files]
             """
@@ -204,13 +204,21 @@ class VAEGAN(nn.Module):
             real_files = read_file_list(real_file_list_file)
         else:
             real_files = produce_shuffled_file_list('/home/forisk/3D-IWGAN/3D-Generation/data/train/chair/', real_file_list_file)
-        if os.path.exists(fake_file_list_file):
-            fake_files = read_file_list(fake_file_list_file)
-        else:
-            fake_files = produce_shuffled_file_list('/home/forisk/3D-IWGAN/3D-Reconstruction-Kinect/data/train/chair/', fake_file_list_file)  
+
+        fake_files = []
+        for real_file in real_files:
+            fake_filename = '/' + real_file.split('/')[-1].split('_')[-2] + '.npy'
+            fake_files.append('/home/forisk/3D-IWGAN/3D-Reconstruction-Kinect/data/train/chair' + fake_filename)
+
+        #if os.path.exists(fake_file_list_file):
+        #    fake_files = read_file_list(fake_file_list_file)
+        #else:
+        #    fake_files = produce_shuffled_file_list('/home/forisk/3D-IWGAN/3D-Reconstruction-Kinect/data/train/chair/', fake_file_list_file)  
+
         real_files = real_files[:num_real_files]
         fake_files = fake_files[:num_fake_files]
-
+        print('Real files', real_files[0])
+        print('Fake files', fake_files[0])
 
         # TODO: All this needs to be redone if it turns out that there
         # is a mapping between the real and fake data
@@ -249,8 +257,8 @@ class VAEGAN(nn.Module):
 
 
         # Create DataLoaders from the datasets
-        real_train_dataloader = utils_data.DataLoader(real_train_dataset, batch_size=8, shuffle=True, num_workers=2)
-        fake_train_dataloader = utils_data.DataLoader(fake_train_dataset, batch_size=8, shuffle=True, num_workers=2)
+        real_train_dataloader = utils_data.DataLoader(real_train_dataset, batch_size=16, shuffle=False, num_workers=2)
+        fake_train_dataloader = utils_data.DataLoader(fake_train_dataset, batch_size=16, shuffle=False, num_workers=2)
 
         for run in range(training_runs):
             # Create networks
@@ -259,9 +267,9 @@ class VAEGAN(nn.Module):
             netD = Discriminator(device=device, num_retype=1).to(device)
             
             # Create optimizers
-            optimizerVAE = optim.Adam(netVAE.parameters(), lr=0.001)
-            optimizerG = optim.Adam(netG.parameters(), lr=0.001)
-            optimizerD = optim.Adam(netD.parameters(), lr=0.001)
+            optimizerVAE = optim.Adam(netVAE.parameters(), lr=1e-4)
+            optimizerG = optim.Adam(netG.parameters(), lr=1e-4)
+            optimizerD = optim.Adam(netD.parameters(), lr=1e-4)
  
             epoch = 0
 
