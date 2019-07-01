@@ -18,24 +18,17 @@ print("DEVICE IS {0}".format(str(device)))
 class VAEGAN(nn.Module):
 
     # TODO: This has too many parameters :O
-    def train(self, netVAE, netG, netD, real_dataloader, fake_dataloader, optimizerVAE, optimizerG, optimizerD, epoch, loss_file, model_file, generated_output_dir): 
-        real_iter = iter(real_dataloader)
-        fake_iter = iter(fake_dataloader)
+    def train(self, netVAE, netG, netD, dataloader, optimizerVAE, optimizerG, optimizerD, epoch, loss_file, model_file, generated_output_dir): 
+        iterator = iter(dataloader)
         while True:
             try:
-                real_data = real_iter.next()
-                if not real_data:
-                    break
-                fake_data = fake_iter.next()
-                if not fake_data:
+                data = iterator.next()
+                if not data:
                     break
             except StopIteration:
                 break
-            real_data = real_data['inputs'].to(device)
-            fake_data = fake_data['inputs'].to(device)
-            batch_size = min(fake_data.shape[0], real_data.shape[0])
-            real_data = real_data[0:batch_size]
-            fake_data = fake_data[0:batch_size]
+            real_data = data['real_data'].to(device)
+            fake_data = data['fake_data'].to(device)
 
             ###################################################################
             # Forward pass through the network
@@ -184,6 +177,7 @@ class VAEGAN(nn.Module):
         # Get lists of files
         real_file_list_file = 'output/file_lists/real_chairs.txt'
         fake_file_list_file = 'output/file_lists/fake_chairs.txt'
+        
         """
         Load data of protein residues
 

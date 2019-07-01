@@ -10,33 +10,23 @@ from sklearn.utils import shuffle
 
 
 class ShapeNetsDataset(Dataset):
-    def __init__(self, filename, label, lower_bound=None, upper_bound=None):
+    def __init__(self, real_filename, fake_filename, label, lower_bound=None, upper_bound=None):
         """
-        Initializes a dataset for the given pickle file.
-        
-        Each element represents a residue and consists of a sparse representation
-        of a 4-D tensor. Conceptually, at each 3-D grid location, there is a
-        vector of ~167 "atom densities" (TODO - is this the right terminology). 
-        To save memory, we only store non-zero entries. Each row contains
-        (x, y, z, atom #, value), where the first 4 values represent the
-        indexes, and the last value is the actual feature value.
-
-        In addition, the residue is labeled with its quality score, UNLESS
-        the "label" parameter is set, in that "label" gets applied to all
-        points in the dataset.
-
-        If upper_bound and/or lower_bound are set, we only include residues
-        whose scores fall within that range.
+        Initializes an entry in the 3D shapes dataset. This simultaneously reads
+        in a real 3D shape and the corresponding fake shape from the  (the mapping is important here).
         """
-        self.data = np.load(filename)  # 3D Shape Nets
-        self.data = np.expand_dims(self.data, 4)
-        print('Data shape', self.data.shape)
-        self.labels = [label] * self.data.shape[0]  # Labels (quality score)
+        self.real_data = np.load(real_filename)
+        self.fake_data = np.load(fake_filename)
         
+        # To match the format of the protein dataset, add a 5th dimension
+        # (the features at each pixel - even though there's only 1 feature)
+        self.real_data = np.expand_dims(self.real_data, 4)
+        self.fake_data = np.expand_dims(self.fake_data, 4)
+        print('Data shape', self.real_data.shape)
+
     def __len__(self):
         return 1
 
     def __getitem__(self, idx): 
-        return {'inputs': torch.FloatTensor(self.data),
-                'labels': torch.FloatTensor([self.labels[idx]]) }
-
+        return {'real_data': torch.FloatTensor(self.real_data),
+                'fake_data': torch.FloatTensor(self.fake_data)}
