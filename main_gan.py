@@ -29,6 +29,8 @@ class VAEGAN(nn.Module):
                 break
             real_data = data['real_data'].to(device)
             fake_data = data['fake_data'].to(device)
+            assert(fake_data.shape[0] == real_data.shape[0])
+            batch_size = fake_data.shape[0]
 
             ###################################################################
             # Forward pass through the network
@@ -123,7 +125,7 @@ class VAEGAN(nn.Module):
             optimizerVAE.step()
 
             # Every 5th batch, compute gradient w.r.t generator loss and update the generator
-            if i % 1 == 0:
+            if i % 5 == 0:
                 g_loss.backward()
                 optimizerG.step()
 
@@ -159,9 +161,9 @@ class VAEGAN(nn.Module):
             os.makedirs(output_dir, exist_ok=True)
 
         training_runs = 1  # Number of experiments
-        num_epochs = 50  # Number of epochs to train the discriminator. Note that the generator is only updated every 5th epoch.
+        num_epochs = 1000  # Number of epochs to train the discriminator. Note that the generator is only updated every 5th epoch.
 
-        fraction_test = 0.2
+        fraction_test = 0.
         fraction_validation = 0.2
 
         model_prefix = 'gan_1'
@@ -191,75 +193,49 @@ class VAEGAN(nn.Module):
             fake_files = produce_shuffled_file_list('/net/scratch/aivan/decoys/ornate/pkl.rand70', fake_file_list_file)
         real_files = real_files[:num_real_files]
         fake_files = fake_files[:num_fake_files]
-            """
+        """
 
 
-        if os.path.exists(real_file_list_file):
-            real_files = read_file_list(real_file_list_file)
+        if os.path.exists(fake_file_list_file):
+            fake_files = read_file_list(fake_file_list_file)
         else:
-            real_files = produce_shuffled_file_list('/home/forisk/3D-IWGAN/3D-Generation/data/train/chair/', real_file_list_file)
+            fake_files = produce_shuffled_file_list('/home/forisk/3D-IWGAN/3D-Reconstruction-Kinect/data/surfaces/train/chair/', fake_file_list_file)
 
-        fake_files = []
-        for real_file in real_files:
-            fake_filename = '/' + real_file.split('/')[-1].split('_')[-2] + '.npy'
-            fake_files.append('/home/forisk/3D-IWGAN/3D-Reconstruction-Kinect/data/train/chair' + fake_filename)
-
-        #if os.path.exists(fake_file_list_file):
-        #    fake_files = read_file_list(fake_file_list_file)
-        #else:
-        #    fake_files = produce_shuffled_file_list('/home/forisk/3D-IWGAN/3D-Reconstruction-Kinect/data/train/chair/', fake_file_list_file)  
+        real_files = []
+        for fake_file in fake_files:
+            real_filename = '/' + fake_file.split('/')[-1].split('_')[-2] + '.npy'
+            real_files.append('/home/forisk/3D-IWGAN/3D-Reconstruction-Kinect/data/train/chair' + real_filename)
 
         real_files = real_files[:num_real_files]
         fake_files = fake_files[:num_fake_files]
-        print('Real files', real_files[0])
-        print('Fake files', fake_files[0])
+        print('Real files', real_files[0:10])
+        print('Fake files', fake_files[0:10])
 
-        # TODO: All this needs to be redone if it turns out that there
-        # is a mapping between the real and fake data
-
-        # Create a dataset for each file (real and fake)
-        real_datasets = []
-        real_examples = 0
-        for real_file in real_files:
-            real_dataset = ShapeNetsDataset(real_file, label=1)
-            real_datasets.append(real_dataset)
-            real_examples += len(real_dataset)
-
-        fake_datasets = []
-        fake_examples = 0
-        for fake_file in fake_files:
-            fake_dataset = ShapeNetsDataset(fake_file, label=0) #, upper_bound=fake_upper_bound)
-            fake_datasets.append(fake_dataset)
-            fake_examples += len(fake_dataset)
-        print('Real examples', real_examples)
-        print('Fake examples', fake_examples)
+        # Create a dataset for each pair of real/fake files
+        datasets = []
+        for i in range(len(real_files)):
+            dataset = ShapeNetsDataset(real_files[i], fake_files[i])
+            datasets.append(dataset)
+        print('Num real examples = num fake examples = ', len(datasets))
 
         # Create combined datasets by concatenating the file datasets
-        fake_full_dataset = utils_data.ConcatDataset(fake_datasets)
-        real_full_dataset = utils_data.ConcatDataset(real_datasets)
+        full_dataset = utils_data.ConcatDataset(datasets)
 
         # Split into train/validation/test for real data
-        real_validation_size = int(fraction_validation * len(real_full_dataset))
-        real_test_size = int(fraction_test * len(real_full_dataset))
-        real_train_size = len(real_full_dataset) - real_validation_size - real_test_size
-        real_train_dataset, real_validation_dataset, real_test_dataset = torch.utils.data.random_split(real_full_dataset, [real_train_size, real_validation_size, real_test_size])
-
-        fake_validation_size = int(fraction_validation * len(fake_full_dataset))
-        fake_test_size = int(fraction_test * len(fake_full_dataset))
-        fake_train_size = len(fake_full_dataset) - fake_validation_size - fake_test_size
-        fake_train_dataset, fake_validation_dataset, fake_test_dataset = torch.utils.data.random_split(fake_full_dataset, [fake_train_size, fake_validation_size, fake_test_size])
-
+        validation_size = int(fraction_validation * len(full_dataset))
+        test_size = int(fraction_test * len(full_dataset))
+        train_size = len(full_dataset) - validation_size - test_size
+        train_dataset, validation_dataset, test_dataset = torch.utils.data.random_split(full_dataset, [train_size, validation_size, test_size])
 
         # Create DataLoaders from the datasets
-        real_train_dataloader = utils_data.DataLoader(real_train_dataset, batch_size=16, shuffle=False, num_workers=2)
-        fake_train_dataloader = utils_data.DataLoader(fake_train_dataset, batch_size=16, shuffle=False, num_workers=2)
+        train_dataloader = utils_data.DataLoader(train_dataset, batch_size=16, shuffle=True, num_workers=2)
 
         for run in range(training_runs):
             # Create networks
             netVAE = SurfaceVAE(device=device, num_retype=1).to(device)
             netG = Generator().to(device)
             netD = Discriminator(device=device, num_retype=1).to(device)
-            
+ 
             # Create optimizers
             optimizerVAE = optim.Adam(netVAE.parameters(), lr=1e-4)
             optimizerG = optim.Adam(netG.parameters(), lr=1e-4)
@@ -272,6 +248,7 @@ class VAEGAN(nn.Module):
                 f.write('epoch, kl_loss, recon_loss, d_loss, g_loss\n')
             model_file = 'output/models/' + model_prefix + '_' + str(run) + '_model'
             generated_output_dir = 'output/generated/'
+
             # If there is a partially-trained model already, just load it
             #if os.path.exists(model_file):
                 #checkpoint = torch.load(model_file)
@@ -287,7 +264,7 @@ class VAEGAN(nn.Module):
 
             while epoch < num_epochs:
                 print('Epoch', epoch)
-                self.train(netVAE, netG, netD, real_train_dataloader, fake_train_dataloader, optimizerVAE, optimizerG, optimizerD, epoch, loss_file, model_file, generated_output_dir)
+                self.train(netVAE, netG, netD, train_dataloader, optimizerVAE, optimizerG, optimizerD, epoch, loss_file, model_file, generated_output_dir)
                 #test(net, validation_dataloader, criterion, epoch, test_loss_file)
                 epoch += 1     
 

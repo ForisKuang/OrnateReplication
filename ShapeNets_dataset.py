@@ -10,7 +10,7 @@ from sklearn.utils import shuffle
 
 
 class ShapeNetsDataset(Dataset):
-    def __init__(self, real_filename, fake_filename, label, lower_bound=None, upper_bound=None):
+    def __init__(self, real_filename, fake_filename):
         """
         Initializes an entry in the 3D shapes dataset. This simultaneously reads
         in a real 3D shape and the corresponding fake shape from the  (the mapping is important here).
