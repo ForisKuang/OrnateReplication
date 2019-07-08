@@ -22,7 +22,6 @@ class ShapeNetsDataset(Dataset):
         # (the features at each pixel - even though there's only 1 feature)
         self.real_data = np.expand_dims(self.real_data, 4)
         self.fake_data = np.expand_dims(self.fake_data, 4)
-        print('Data shape', self.real_data.shape)
 
     def __len__(self):
         return 1

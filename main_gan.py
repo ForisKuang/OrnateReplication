@@ -71,7 +71,8 @@ class VAEGAN(nn.Module):
             interpolates = real_data + inter
 
             # TODO: Check if this is the correct conversion from Tensorflow
-            gradients = torch.autograd.grad(netD(interpolates).mean(), interpolates, retain_graph=True)[0]
+            gradients = torch.autograd.grad(netD(interpolates).mean(), interpolates)[0]
+            print('gradient shape', gradients.shape)
             slopes = torch.sqrt((gradients ** 2).sum())
             gradient_penalty = ((slopes - 1.)**2)
 
@@ -120,14 +121,21 @@ class VAEGAN(nn.Module):
             optimizerD.zero_grad()
             d_loss.backward(retain_graph=True)
             v_loss.backward(retain_graph=True)
-            recon_loss.backward(retain_graph=True)
+ 
             optimizerD.step()
             optimizerVAE.step()
 
             # Every 5th batch, compute gradient w.r.t generator loss and update the generator
             if i % 5 == 0:
+                recon_loss.backward(retain_graph=True)
                 g_loss.backward()
+                optimizerD.step()
                 optimizerG.step()
+                optimizerVAE.step()
+            else:
+                recon_loss.backward()
+                optimizerD.step()
+                optimizerVAE.step()
 
             # Save network to file so that it can be reused
             torch.save({
@@ -147,7 +155,6 @@ class VAEGAN(nn.Module):
         # Write example generated outputs to file
         for i in range(G_dec.shape[0]):
             file_path = os.path.join(generated_output_dir, 'epoch_' + str(epoch) + '_gen_decoded_' + str(i) + '.npy')
-            print('file_path', file_path)
             np.save(file_path, G_dec[i].cpu().detach())
         for i in range(G_train.shape[0]):
             file_path = os.path.join(generated_output_dir, 'epoch_' + str(epoch) + '_gen_random_' + str(i) + '.npy')
@@ -170,7 +177,6 @@ class VAEGAN(nn.Module):
 
         # TODO: When model works, drastically increase this
         num_real_files = 20000
-        num_fake_files = 20000
 
         # For fake structures, only include structures whose quality score is LESS than
         # this number
@@ -206,8 +212,8 @@ class VAEGAN(nn.Module):
             real_filename = '/' + fake_file.split('/')[-1].split('_')[-2] + '.npy'
             real_files.append('/home/forisk/3D-IWGAN/3D-Reconstruction-Kinect/data/train/chair' + real_filename)
 
-        real_files = real_files[:num_real_files]
-        fake_files = fake_files[:num_fake_files]
+        #real_files = real_files[:num_real_files]
+        #fake_files = fake_files[:num_real_files]
         print('Real files', real_files[0:10])
         print('Fake files', fake_files[0:10])
 
