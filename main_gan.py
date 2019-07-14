@@ -18,7 +18,7 @@ print("DEVICE IS {0}".format(str(device)))
 class VAEGAN(nn.Module):
 
     # TODO: This has too many parameters :O
-    def train(self, netVAE, netG, netD, dataloader, optimizerVAE, optimizerG, optimizerD, epoch, loss_file, model_file, generated_output_dir): 
+    def train(self, netVAE, netG, netD, dataloader, optimizerVAE, optimizerG, optimizerD, epoch, loss_file, model_file, generated_output_dir):
         iterator = iter(dataloader)
         while True:
             try:
@@ -39,7 +39,7 @@ class VAEGAN(nn.Module):
             means, sigmas = netVAE(fake_data)
 
             # Sample latent vector z_x from a Gaussian with the mean/variance returned by surface VAE
-            eps = torch.randn((batch_size, 400)).to(device)
+            eps = torch.randn((batch_size, 200)).to(device)
             z_x = means + sigmas * eps
 
             # Structure produced by generator (decoder) from the initial fake structure
@@ -48,7 +48,7 @@ class VAEGAN(nn.Module):
 
             # Now, use the generator to generate a structure from a random
             # latent vector sampled from Normal(0, 1).
-            z = torch.randn((batch_size, 400)).to(device) 
+            z = torch.randn((batch_size, 200)).to(device)
             G_train = netG(z)
 
             # Score the generated structure with the discriminator
@@ -59,7 +59,7 @@ class VAEGAN(nn.Module):
 
             ###################################################################
             # Compute gradient penalty. Goal is to push the L2-norm of the gradient of the
-            # discriminator (at interpolated structures between the generated and real 
+            # discriminator (at interpolated structures between the generated and real
             # ones) to be close to 1.
             ###################################################################
             alpha = torch.rand((batch_size, 1)).to(device) # Sample from Uniform(0, 1)
@@ -121,7 +121,7 @@ class VAEGAN(nn.Module):
             optimizerD.zero_grad()
             d_loss.backward(retain_graph=True)
             v_loss.backward(retain_graph=True)
- 
+
             optimizerD.step()
             optimizerVAE.step()
 
@@ -150,7 +150,7 @@ class VAEGAN(nn.Module):
 
             # Write losses to file
             with open(loss_file, 'a+') as f:
-                f.write(str(epoch) + ', ' + str(kl_loss.item()) + ', ' + str(recon_loss.item()) + ', ' + str(d_loss.item()) + ', ' + str(g_loss.item()) + '\n') 
+                f.write(str(epoch) + ', ' + str(kl_loss.item()) + ', ' + str(recon_loss.item()) + ', ' + str(d_loss.item()) + ', ' + str(g_loss.item()) + ', ' + str(gradient_penalty.item()) + ', ' + str(D_fake.mean().item()) + ', ' + str(D_legit.mean().item()) + '\n')
 
         # Write example generated outputs to file
         for i in range(G_dec.shape[0]):
@@ -162,7 +162,7 @@ class VAEGAN(nn.Module):
 
 
     def main(self):
-        # Create necessary output directories if they don't exist already 
+        # Create necessary output directories if they don't exist already
         output_dirs = ['output/models', 'output/gan_loss', 'output/file_lists', 'output/generated']
         for output_dir in output_dirs:
             os.makedirs(output_dir, exist_ok=True)
@@ -185,7 +185,7 @@ class VAEGAN(nn.Module):
         # Get lists of files
         real_file_list_file = 'output/file_lists/real_chairs.txt'
         fake_file_list_file = 'output/file_lists/fake_chairs.txt'
-        
+
         """
         Load data of protein residues
 
@@ -241,17 +241,17 @@ class VAEGAN(nn.Module):
             netVAE = SurfaceVAE(device=device, num_retype=1).to(device)
             netG = Generator().to(device)
             netD = Discriminator(device=device, num_retype=1).to(device)
- 
+
             # Create optimizers
             optimizerVAE = optim.Adam(netVAE.parameters(), lr=1e-4)
             optimizerG = optim.Adam(netG.parameters(), lr=1e-4)
-            optimizerD = optim.Adam(netD.parameters(), lr=1e-4)
- 
+            optimizerD = optim.Adam(netD.parameters(), lr=1e-5)
+
             epoch = 0
 
             loss_file = 'output/gan_loss/' + model_prefix + '_' + str(run) + '_loss.csv'
             with open(loss_file, 'w') as f:
-                f.write('epoch, kl_loss, recon_loss, d_loss, g_loss\n')
+                f.write('epoch, kl_loss, recon_loss, d_loss, g_loss, gradient penalty, D_fake, D_legit\n')
             model_file = 'output/models/' + model_prefix + '_' + str(run) + '_model'
             generated_output_dir = 'output/generated/'
 
@@ -272,7 +272,7 @@ class VAEGAN(nn.Module):
                 print('Epoch', epoch)
                 self.train(netVAE, netG, netD, train_dataloader, optimizerVAE, optimizerG, optimizerD, epoch, loss_file, model_file, generated_output_dir)
                 #test(net, validation_dataloader, criterion, epoch, test_loss_file)
-                epoch += 1     
+                epoch += 1
 
 
 

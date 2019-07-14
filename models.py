@@ -130,8 +130,8 @@ class SurfaceVAE(nn.Module):
         self.apply_conv2 = self.conv(self.CONV1, self.CONV2, 4, stride=2, padding=1)
         self.apply_conv3 = self.conv(self.CONV2, self.CONV3, 4, stride=2, padding=1)
 
-        self.means_linear = nn.Linear(self.CONV3*4*4*4, 400)
-        self.sigmas_linear = nn.Linear(self.CONV3*4*4*4, 400)
+        self.means_linear = nn.Linear(self.CONV3*4*4*4, 200)
+        self.sigmas_linear = nn.Linear(self.CONV3*4*4*4, 200)
 
         # Default dropout is set to 0.5
         self.dropout = nn.Dropout()
@@ -223,7 +223,7 @@ class Generator(nn.Module):
         self.DECONV1 = 40
         self.DECONV2 = 20
         self.DECONV3 = 1
-        self.linear1 = nn.Linear(400, self.DECONV0*4*4*4)
+        self.linear1 = nn.Linear(200, self.DECONV0*4*4*4)
         self.batchNorm1 = nn.BatchNorm3d(self.DECONV0)
         self.batchNorm2 = nn.BatchNorm3d(self.DECONV1)
         self.batchNorm3 = nn.BatchNorm3d(self.DECONV2)

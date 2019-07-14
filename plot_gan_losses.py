@@ -3,7 +3,7 @@ import numpy as np
 
 prefix = 'output/gan_loss/gan_1_'
 runs = 1
-loss_types = ['KL loss', 'Reconstruction loss', 'Discriminator loss', 'Generator loss']
+loss_types = ['KL loss', 'Reconstruction loss', 'Discriminator loss', 'Generator loss', 'Gradient penalty', 'D_fake', 'D_legit']
 
 # 3-D list. First, there is a 2-D list for each loss type (Discriminator loss, Generator loss, etc).
 # Then, each 2-D list contains lists for each run of the model; each individual list represents
